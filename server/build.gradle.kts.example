@@ -1,0 +1,40 @@
+plugins {
+    id("org.springframework.boot") version "4.0.1"
+    id("java")
+}
+
+group = "com.taskboard"
+version = "0.0.1-SNAPSHOT"
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Web starter (includes Tomcat)
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    
+    // H2 Database
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    runtimeOnly("com.h2database:h2")
+    
+    // Validation
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    
+    // Test
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+tasks.withType<JavaCompile> {
+    options.compilerArgs.addAll(listOf("-processor", "lombok.Lombok"))
+}
+
+tasks.test {
+    useJUnitPlatform()
+}

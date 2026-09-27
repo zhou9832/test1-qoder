@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS health_check (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
