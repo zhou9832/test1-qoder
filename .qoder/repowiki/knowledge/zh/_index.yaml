@@ -1,0 +1,50 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: master
+nodes_managed: true
+exported_at: "2026-09-27T07:31:17Z"
+modules:
+    "":
+        dir_name: TaskBoard Monorepo 根目录
+        title: TaskBoard Monorepo 根目录
+        scope:
+            - README.md
+            - INIT_REPORT.md
+            - .gitignore
+        source_files: []
+        children:
+            - docs
+            - server
+            - web
+        depends_on: []
+        related_to: []
+    docs:
+        dir_name: TaskBoard 项目文档（PRD 与缺陷账本）
+        title: TaskBoard 项目文档（PRD 与缺陷账本）
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    server:
+        dir_name: TaskBoard Spring Boot 服务端
+        title: TaskBoard Spring Boot 服务端
+        scope:
+            - server/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: web
+    web:
+        dir_name: TaskBoard Web 前端应用
+        title: TaskBoard Web 前端应用
+        scope:
+            - web/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: server

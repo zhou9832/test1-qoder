@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: ""
+title: TaskBoard Monorepo 根目录
+scope:
+    - README.md
+    - INIT_REPORT.md
+    - .gitignore
+source_files: []
+depends_on: []
+related_to: []

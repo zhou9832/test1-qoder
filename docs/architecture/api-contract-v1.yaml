@@ -1,0 +1,1239 @@
+# TaskBoard API Contract v1
+
+> 对应 PRD B.5 端点清单，受章程红线 6、30 号契约规则约束。  
+> 全部响应包裹 `ApiResponse<T>`，分页用 `PageResult<T>`，时间 ISO-8601 带时区偏移。  
+> 错误码分段：40xxx 参数/校验、42xxx 状态流转、49xxx 内部错误。
+
+## 全局约定
+
+### 响应包装结构
+
+```yaml
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: "业务状态码；0=成功"
+          example: 0
+        message:
+          type: string
+          description: "人类可读消息（可回显前端）"
+          example: Success
+        data:
+          description: "泛型数据载体（具体类型随端点变化）"
+      required: [code, message, data]
+    
+    PageResult:
+      type: object
+      description: "分页结果容器"
+      properties:
+        items:
+          type: array
+          items: {}
+          description: "当前页数据列表"
+        total:
+          type: integer
+          format: int64
+          description: "总记录数"
+        page:
+          type: integer
+          format: int32
+          description: "当前页码（从 1 起）"
+          example: 1
+        size:
+          type: integer
+          format: int32
+          description: "每页大小（默认 20，上限 100）"
+          example: 20
+      required: [items, total, page, size]
+    
+    ErrorItem:
+      type: object
+      description: "统一错误详情"
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: "业务细分错误码"
+        field:
+          type: string
+          description: "绑定失败的字段名（参数校验类错误使用）"
+          nullable: true
+        message:
+          type: string
+          description: "错误描述"
+      required: [code, message]
+```
+
+### 分页参数约定
+
+所有分页接口统一使用查询参数：
+
+| 参数 | 类型 | 必填 | 默认值 | 上限 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| `page` | integer | 否 | 1 | — | 页码从 1 起 |
+| `size` | integer | 否 | 20 | 100 | 每页大小 |
+
+### 时间格式约定
+
+| 场景 | 格式 | 示例 |
+| --- | --- | --- |
+| 数据库存储 | TIMESTAMP | H2 原生类型 |
+| Java 侧 | `Instant` | — |
+| JSON 传输 | ISO-8601 + 时区偏移 | `2026-09-29T10:30:00Z` 或 `2026-09-29T18:30:00+08:00` |
+| 前端展示 | ISO-8601 字符串 | 由 `utils/format.ts` 处理，禁止 `new Date().toLocaleString()` |
+
+### 错误码分配表
+
+| 段 | 用途 | 示例 |
+| --- | --- | --- |
+| `40xxx` | 参数与校验错误 | `40001` 必填项缺失, `40002` 超出长度限制, `40003` 重复名称 |
+| `41xxx` | 权限错误（预留） | `41001` 未登录, `41002` Token 过期 |
+| `42xxx` | 状态流转错误 | `42001` 非法状态转换, `42002` 终态不可修改 |
+| `49xxx` | 内部错误 | `49001` 数据库异常, `49002` 外部调用失败 |
+
+---
+
+## 端点清单
+
+### 健康检查
+
+#### 获取系统健康状态
+
+```yaml
+paths:
+  /api/health:
+    get:
+      summary: "获取系统健康状态"
+      tags: [System]
+      responses:
+        '200':
+          description: "健康检查成功"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+                allOf:
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [UP, DOWN]
+                            example: UP
+                          timestamp:
+                            type: string
+                            format: date-time
+                            description: "服务器当前时间"
+                        required: [status, timestamp]
+              example:
+                code: 0
+                message: Success
+                data:
+                  status: UP
+                  timestamp: "2026-09-29T10:30:00Z"
+```
+
+---
+
+### 项目管理
+
+#### 获取项目列表（分页）
+
+```yaml
+  /api/projects:
+    get:
+      summary: "获取项目列表（分页）"
+      tags: [Project]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: keyword
+          in: query
+          schema:
+            type: string
+            maxLength: 64
+          description: "按项目名称模糊搜索（可选）"
+      responses:
+        '200':
+          description: "成功返回分页项目列表"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+                        allOf:
+                          - properties:
+                              items:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ProjectDto'
+                        required: [items, total, page, size]
+              example:
+                code: 0
+                message: Success
+                data:
+                  items:
+                    - id: 1
+                      name: 教程研发
+                      description: 开发教学文档
+                      createdAt: "2026-09-29T10:00:00Z"
+                      updatedAt: "2026-09-29T12:00:00Z"
+                  total: 3
+                  page: 1
+                  size: 20
+```
+
+#### 新建项目
+
+```yaml
+  /api/projects:
+    post:
+      summary: "新建项目"
+      tags: [Project]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  description: "项目名称（必填、唯一）"
+                description:
+                  type: string
+                  maxLength: 512
+                  description: "项目描述（可选）"
+              required: [name]
+      responses:
+        '201':
+          description: "项目创建成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProjectDto'
+              example:
+                code: 0
+                message: Success
+                data:
+                  id: 4
+                  name: 新項目
+                  description: 描述信息
+                  createdAt: "2026-09-29T14:00:00Z"
+                  updatedAt: "2026-09-29T14:00:00Z"
+        '400':
+          description: "参数校验失败"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ErrorItem'
+                        example:
+                          - code: 40001
+                            field: name
+                            message: "项目名称不能为空"
+                          - code: 40002
+                            field: name
+                            message: "项目名称不能超过64个字符"
+```
+
+#### 获取项目详情
+
+```yaml
+  /api/projects/{id}:
+    get:
+      summary: "获取项目详情"
+      tags: [Project]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: "成功返回项目详情"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProjectDto'
+        '404':
+          description: "项目不存在"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 40004
+                            message: "项目不存在"
+```
+
+#### 更新项目
+
+```yaml
+  /api/projects/{id}:
+    put:
+      summary: "更新项目"
+      tags: [Project]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                description:
+                  type: string
+                  maxLength: 512
+      responses:
+        '200':
+          description: "更新成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/ProjectDto'
+        '404':
+          description: "项目不存在"
+        '409':
+          description: "项目名称冲突（重名）"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 40003
+                            field: name
+                            message: "项目名称已存在"
+```
+
+#### 删除项目（级联策略声明）
+
+```yaml
+  /api/projects/{id}:
+    delete:
+      summary: "删除项目"
+      tags: [Project]
+      description: |
+        **删除策略**：级联删除该项目下的所有 Task，Task 的 TimeLog 随 Task 级联删除。
+        此操作不可恢复，前端需二次确认。
+        
+        **引用契约条款**：PRD B.3 "删除 Project 级联删除其 Task、Task 的 TimeLog"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: "删除成功（无内容返回）"
+        '404':
+          description: "项目不存在"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 40004
+                            message: "项目不存在"
+```
+
+---
+
+### 任务管理
+
+#### 获取任务列表（分页 + 过滤）
+
+```yaml
+  /api/tasks:
+    get:
+      summary: "获取任务列表（分页 + 过滤）"
+      tags: [Task]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: "按项目过滤（可选）"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+          description: "按状态过滤（可选）"
+      responses:
+        '200':
+          description: "成功返回分页任务列表"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+                        allOf:
+                          - properties:
+                              items:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TaskDto'
+                        required: [items, total, page, size]
+```
+
+#### 新建任务
+
+```yaml
+  /api/tasks:
+    post:
+      summary: "新建任务"
+      tags: [Task]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [projectId, title]
+              properties:
+                projectId:
+                  type: integer
+                  format: int64
+                  description: "所属项目 ID（必填）"
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  description: "任务标题（必填）"
+                description:
+                  type: string
+                  maxLength: 1024
+                  description: "任务描述（可选）"
+                status:
+                  type: string
+                  enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+                  default: TODO
+                  description: "初始状态（默认为 TODO）"
+                priority:
+                  type: integer
+                  minimum: 0
+                  maximum: 3
+                  default: 0
+                  description: "优先级 0-3（0 最低）"
+                dueAt:
+                  type: string
+                  format: date-time
+                  description: "到期时间（可选，ISO-8601）"
+                tagIds:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                  description: "关联标签 ID 列表（可选）"
+      responses:
+        '201':
+          description: "任务创建成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDto'
+```
+
+#### 获取任务详情
+
+```yaml
+  /api/tasks/{id}:
+    get:
+      summary: "获取任务详情"
+      tags: [Task]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: "成功返回任务详情"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDto'
+        '404':
+          description: "任务不存在"
+```
+
+#### 更新任务（不含 status）
+
+```yaml
+  /api/tasks/{id}:
+    put:
+      summary: "更新任务（不含状态）"
+      tags: [Task]
+      description: |
+        **注意**：状态变更必须通过 `/api/tasks/{id}/transitions` 端点执行。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                description:
+                  type: string
+                  maxLength: 1024
+                priority:
+                  type: integer
+                  minimum: 0
+                  maximum: 3
+                dueAt:
+                  type: string
+                  format: date-time
+                tagIds:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+      responses:
+        '200':
+          description: "更新成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDto'
+        '404':
+          description: "任务不存在"
+```
+
+#### 状态流转（动作端点）
+
+```yaml
+  /api/tasks/{id}/transitions:
+    patch:
+      summary: "任务状态流转"
+      tags: [Task]
+      description: |
+        **状态机校验**：合法性只在 service 层判定，非法流转返回 42xxx 错误码。
+        
+        **引用状态机规则**：PRD B.4
+        
+        ```mermaid
+        stateDiagram-v2
+            [*] --> TODO
+            TODO --> IN_PROGRESS : 合法
+            IN_PROGRESS --> DONE : 合法
+            IN_PROGRESS --> TODO : 回退，合法
+            DONE --> CLOSED : 合法
+            DONE --> IN_PROGRESS : 重开，合法
+            CLOSED --> [*]
+            TODO --> DONE : 非法（须经过进行中）
+            TODO --> CLOSED : 非法
+        ```
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+                  description: "目标状态"
+      responses:
+        '200':
+          description: "状态流转成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TaskTransitionResult'
+        '400':
+          description: "非法状态流转"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 42001
+                            message: "不允许从当前状态直接转移到目标状态"
+        '404':
+          description: "任务不存在"
+        '42002':
+          description: "终态不可修改"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 42002
+                            message: "任务已关闭，不可再修改"
+
+    components:
+      schemas:
+        TaskTransitionResult:
+          type: object
+          description: "状态流转结果"
+          properties:
+            taskId:
+              type: integer
+              format: int64
+            previousStatus:
+              type: string
+              enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+            currentStatus:
+              type: string
+              enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+            transitionedAt:
+              type: string
+              format: date-time
+          required: [taskId, previousStatus, currentStatus, transitionedAt]
+```
+
+#### 删除任务（级联策略声明）
+
+```yaml
+  /api/tasks/{id}:
+    delete:
+      summary: "删除任务"
+      tags: [Task]
+      description: |
+        **删除策略**：级联删除该任务的所有 TimeLog，并通过 JPA REMOVE 操作解除与 Tag 的关联记录。
+        此操作不可恢复，前端需二次确认。
+        
+        **引用契约条款**：PRD B.3 "删除 Task 级联删除其 TimeLog 并解除与 Tag 的关联"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: "删除成功"
+        '404':
+          description: "任务不存在"
+```
+
+---
+
+### 标签管理
+
+#### 获取标签列表
+
+```yaml
+  /api/tags:
+    get:
+      summary: "获取全局标签列表"
+      tags: [Tag]
+      description: "返回所有标签（不分页）"
+      responses:
+        '200':
+          description: "成功返回标签列表"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TagDto'
+              example:
+                code: 0
+                message: Success
+                data:
+                  - id: 1
+                    name: 紧急
+                  - id: 2
+                    name: 重要
+```
+
+#### 新建标签
+
+```yaml
+  /api/tags:
+    post:
+      summary: "新建标签"
+      tags: [Tag]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  description: "标签名称（必填、全局唯一）"
+      responses:
+        '201':
+          description: "标签创建成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TagDto'
+        '409':
+          description: "标签名称冲突"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: null
+                      errors:
+                        items:
+                          - code: 40003
+                            field: name
+                            message: "标签名称已存在"
+```
+
+#### 设置任务标签（全量替换）
+
+```yaml
+  /api/tasks/{id}/tags:
+    put:
+      summary: "设置任务标签（全量替换）"
+      tags: [Task]
+      description: |
+        **替换策略**：全量替换而非增量添加。传入的 tagIds 即为任务最终关联的所有标签。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tagIds:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                  description: "要关联的标签 ID 列表（可为空数组以清除所有标签）"
+              required: [tagIds]
+      responses:
+        '200':
+          description: "标签设置成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TagDto'
+              example:
+                code: 0
+                message: Success
+                data:
+                  - id: 1
+                    name: 紧急
+                  - id: 3
+                    name: Bug
+        '404':
+          description: "任务不存在"
+```
+
+---
+
+### 工时记录
+
+#### 获取工时列表（可按任务过滤）
+
+```yaml
+  /api/timelogs:
+    get:
+      summary: "获取工时列表"
+      tags: [TimeLog]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: taskId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: "按任务过滤（可选）"
+      responses:
+        '200':
+          description: "成功返回工时列表"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/PageResult'
+                        allOf:
+                          - properties:
+                              items:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TimeLogDto'
+                        required: [items, total, page, size]
+```
+
+#### 填报工时
+
+```yaml
+  /api/timelogs:
+    post:
+      summary: "填报工时"
+      tags: [TimeLog]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [taskId, hours, workDate]
+              properties:
+                taskId:
+                  type: integer
+                  format: int64
+                  description: "任务 ID（必填）"
+                hours:
+                  type: string
+                  description: "工时值（字符串或整数分钟，禁止浮点）"
+                  example: "45"
+                workDate:
+                  type: string
+                  format: date
+                  description: "工作日期（ISO-8601 日期格式）"
+                  example: "2026-09-29"
+                note:
+                  type: string
+                  maxLength: 256
+                  description: "备注（可选）"
+      responses:
+        '201':
+          description: "工时填报成功"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        $ref: '#/components/schemas/TimeLogDto'
+```
+
+#### 删除工时
+
+```yaml
+  /api/timelogs/{id}:
+    delete:
+      summary: "删除工时记录"
+      tags: [TimeLog]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: "删除成功"
+        '404':
+          description: "工时记录不存在"
+```
+
+---
+
+### 统计报表（预留端点）
+
+#### 按人统计
+
+```yaml
+  /api/stats/by-assignee:
+    get:
+      summary: "按人统计（预留端点）"
+      tags: [Statistics]
+      description: |
+        **预留**：无指派人时按项目统计。
+        具体请求参数与响应结构待需求明确后补充。
+      responses:
+        '200':
+          description: "统计成功（结构待定义）"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: object
+                        description: "占位结构，实际随需求明确"
+              example:
+                code: 0
+                message: Success
+                data: {}
+```
+
+#### 按周统计
+
+```yaml
+  /api/stats/by-week:
+    get:
+      summary: "按周统计"
+      tags: [Statistics]
+      parameters:
+        - name: weekStart
+          in: query
+          schema:
+            type: string
+            format: date
+            description: "起始日期（ISO-8601 日期格式，可选）"
+        - name: weekEnd
+          in: query
+          schema:
+            type: string
+            format: date
+            description: "结束日期（ISO-8601 日期格式，可选）"
+      responses:
+        '200':
+          description: "成功返回按周统计数据"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            week:
+                              type: string
+                              description: "周次标识（如 2026-W40）"
+                            totalHours:
+                              type: integer
+                              description: "该周总工时（分钟）"
+                            taskCount:
+                              type: integer
+                              description: "该周有记录的任务数"
+                          required: [week, totalHours, taskCount]
+```
+
+#### 按状态统计
+
+```yaml
+  /api/stats/by-status:
+    get:
+      summary: "按状态统计"
+      tags: [Statistics]
+      responses:
+        '200':
+          description: "成功返回按状态统计数据"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            status:
+                              type: string
+                              enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+                            count:
+                              type: integer
+                              description: "该状态下的任务数量"
+                            totalHours:
+                              type: integer
+                              description: "该状态下任务的累计工时（分钟）"
+                          required: [status, count, totalHours]
+              example:
+                code: 0
+                message: Success
+                data:
+                  - status: TODO
+                    count: 5
+                    totalHours: 120
+                  - status: IN_PROGRESS
+                    count: 3
+                    totalHours: 90
+                  - status: DONE
+                    count: 2
+                    totalHours: 60
+                  - status: CLOSED
+                    count: 1
+                    totalHours: 30
+```
+
+---
+
+## DTO 定义参考
+
+> 以下为领域实体的 DTO 骨架，具体字段随 Entity 实现同步生成。
+
+```yaml
+components:
+  schemas:
+    ProjectDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, createdAt, updatedAt]
+    
+    TaskDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [TODO, IN_PROGRESS, DONE, CLOSED]
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 3
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagDto'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, projectId, title, status, priority, createdAt, updatedAt]
+    
+    TagDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+      required: [id, name]
+    
+    TimeLogDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        taskId:
+          type: integer
+          format: int64
+        hours:
+          type: string
+          description: "工时分（字符串存储，禁浮点）"
+        workDate:
+          type: string
+          format: date
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, taskId, hours, workDate, createdAt]
+```
+
+---
+
+## 契约要点总结
+
+| 要点 | 规则 |
+| --- | --- |
+| 统一响应包裹 | 所有端点返回 `ApiResponse<T>`，成功 `code=0` |
+| 分页标准 | `page`（从 1 起）、`size`（默认 20，上限 100），响应 `PageResult<T>` |
+| 时间格式 | 传输 ISO-8601 带时区，前端走统一工具处理 |
+| 错误码分段 | 40xxx 参数校验 / 41xxx 权限 / 42xxx 状态流转 / 49xxx 内部错误 |
+| 动作端点命名 | `/api/<资源>/<id>/<动作>`（如 `/api/tasks/1/transitions`） |
+| 删除级联声明 | 删除接口 `description` 必须声明关联数据处理方式（见各 DELETE 端点） |
+| 状态变更隔离 | `status` 不得在 PUT /tasks/{id} 中修改，只能走 `/transitions` 端点 |
+| 表单提交格式 | 后端使用 `application/x-www-form-urlencoded`（便于 Spring @RequestParam 接收） |
+| 工时禁浮点 | `TimeLog.hours` 使用 String 存储，避免精度问题 |
