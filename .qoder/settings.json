@@ -1,0 +1,31 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".qoder\\hooks\\guard-test-engineer.ps1",
+            "timeout": 60,
+            "workingDir": "${workspaceRoot}"
+          }
+        ]
+      }
+    ]
+  },
+  "agents": {
+    "test-engineer": {
+      "disallowedPaths": [
+        "server/src/main/**",
+        "web/src/**/*.tsx",
+        "web/src/**/*.ts"
+      ],
+      "allowedPaths": [
+        "server/src/test/**",
+        ".qoder/agents/**",
+        "docs/**"
+      ]
+    }
+  }
+}

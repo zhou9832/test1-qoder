@@ -3,6 +3,7 @@ package com.taskboard.controller;
 import com.taskboard.dto.ApiResponse;
 import com.taskboard.dto.CreateTaskRequest;
 import com.taskboard.dto.TaskDto;
+import com.taskboard.dto.TaskTransitionResult;
 import com.taskboard.dto.UpdateTaskRequest;
 import com.taskboard.service.TaskService;
 import org.springframework.http.HttpStatus;
@@ -36,7 +37,7 @@ public class TaskController {
      * Create a new task.
      */
     @PostMapping
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<TaskDto> createTask(CreateTaskRequest request) {
         TaskDto created = taskService.createTask(request);
         return ApiResponse.success(created);
@@ -68,21 +69,20 @@ public class TaskController {
      * Transition task status using state machine rules.
      */
     @PatchMapping("/{id}/transitions")
-    public ApiResponse<TaskDto> transitionStatus(
+    public ApiResponse<TaskTransitionResult> transitionStatus(
             @PathVariable Long id,
             @RequestParam String to
     ) {
-        TaskDto updated = taskService.transitionStatus(id, to);
-        return ApiResponse.success(updated);
+        TaskTransitionResult result = taskService.transitionStatus(id, to);
+        return ApiResponse.success(result);
     }
 
     /**
      * Delete a task by ID.
      */
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
-    public ApiResponse<Void> deleteTask(@PathVariable Long id) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
-        return ApiResponse.success(null);
     }
 }

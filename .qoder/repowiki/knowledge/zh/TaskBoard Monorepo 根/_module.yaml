@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: TaskBoard Monorepo 根目录
+title: TaskBoard Monorepo 根
 scope:
     - README.md
     - INIT_REPORT.md

@@ -27,11 +27,23 @@ description: 当需要为 TaskBoard 新增一个实体的完整增删改查功�
    ✅ 完成标志: 列出文件路径
 5. **mapper**：新建 Entity↔DTO 转换（MapStruct 或手写，二者择一并全项目统一）。
    ✅ 完成标志: 列出文件路径 + 说明用了 MapStruct 还是手写
-6. **service**：新建业务逻辑类（无接口，遵循 10 号"不建空转接口"）；
+6. **service**：新建业务逻辑类（无接口，遵循 10 号“不建空转接口”）；
    删除策略、状态流转等业务决策若领域模型未定义，停下来问。
    ✅ 完成标志: 列出文件路径 + 公开方法签名清单
-7. **controller**：新建控制器，返回 ApiResponse<T>，动作型操作用
-   /api/<资源>/<id>/<动作> 端点（遵循 30 号）。
+7. **基础设施**：创建 common 包中的核心类（如果不存在）：
+   - `PageResult.java` - 分页容器 (items/total/page/size)
+   - `BizException.java` - 业务异常
+   - `ErrorCode.java` - 错误码常量 (40001/40002/40003/40004 等)
+   - `GlobalExceptionHandler.java` - 全局异常处理器，将 BizException 转为 ApiResponse 带 errors 数组
+   ⚠️ **此步不可跳过!** 否则 Controller 的错误响应不符合契约规范。
+   ✅ 完成标志: 输出创建的文件路径 + ErrorCode 常量列表
+8. **controller**：新建控制器，返回 ApiResponse<T>，遵守以下契约约束：
+   - GET 列表接口：必须支持 `@RequestParam page/size/keyword`，返回 `ApiResponse<PageResult<XxxDto>>`
+   - POST 创建接口：HTTP 状态码 201（不要加 @ResponseStatus(HttpStatus.OK)）
+   - DELETE 删除接口：HTTP 状态码 204（移除 @ResponseStatus(HttpStatus.OK)）
+   - 错误处理：抛 BizException(ErrorCode.XXX) 而非 ResponseStatusException
+   - 动作型操作用 /api/<资源>/<id>/<动作> 端点（遵循 30 号）
+   ⚠️ **参考 api-contract-v1.yaml 对应端点的 HTTP 状态码和响应结构**
    ✅ 完成标志: 列出文件路径 + @RequestMapping/@PostMapping 等端点注解清单
 8. **契约同步**：运行 scripts/generate-api-types.mjs 重新生成前端类型
    （详见 api-contract-sync 技能）。

@@ -63,6 +63,20 @@ export class ApiClient {
     });
   }
 
+  async patch<T>(endpoint: string, body: Record<string, unknown>): Promise<ApiResponse<T>> {
+    const filtered = Object.entries(body)
+      .filter(([_, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => [k, String(v)]) as Array<[string, string]>;
+    
+    return this.request<ApiResponse<T>>(endpoint, {
+      method: 'PATCH',
+      body: new URLSearchParams(filtered).toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+  }
+
   async delete(endpoint: string): Promise<void> {
     await this.request(endpoint, { method: 'DELETE' });
   }

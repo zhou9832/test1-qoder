@@ -2,7 +2,28 @@
 
 > 每条缺陷标注：编号 / 现象 / 类型（风格漂移·架构走偏·重复造轮子·跨端不一致·越界·需求漏项·其他，前四类见 1.1，后两类为 1.1 的衍生现象）/
 > 影响（V1-V6 中哪条验收标准失败）/ 期望由哪类机制兜住（规则·技能·子智能体·Wiki）/
-> 状态（v0 裸奔 · v1 规则后 · v2 技能后 · v3 专家团后）
+> 状态（v0 裸奔 · v1 规则后 · v2 技能后 · v3 专家团后 · Hook 后）
+
+## v3 专家团后实验（2026-10-02）— 三模块实现 + Hook 验证
+
+> **实验目标**：在 TaskBoard 现有基础上完成三个功能模块（任务看板/工时填报/统计报表），验证专家团协作能力；同时部署 Hook 机制物理拦截 test-engineer 的业务代码修改冲动。
+
+| # | 现象 | 类型 | 影响 | 期望机制 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| D18 | Charter 红线第 4 条违反：契约变更未经人工签字冻结即执行（stats by-assignee 端点升级、TaskController 行为修改） | 越界 | V1 V2 V4 | 人工介入点（charter v1.2） | v3 ⚠️ 已记录 |
+| D19 | test-engineer 发现缺陷时直接修复业务代码的倾向仍然存在（本次未触发因无 Bug 场景） | 测试独立性破坏 | V6 | Hooks 确定性拦截 | Hook 后 ✅ 已部署 |
+| D20 | 后端公共基础设施（PageResult/BizException/ErrorCode/GlobalExceptionHandler）缺失导致旧测试编译失败 | 架构走偏 | V2 | 规则（common 包） | v3 ✅ 已创建 |
+
+### Hook 机制验证结果
+
+| 测试场景 | 输入路径 | 预期行为 | 实际行为 | 状态 |
+|---------|---------|---------|---------|------|
+| 业务代码拦截 | `server/src/main/java/...` | exit 2 | ✅ exit 2 | ✅ 通过 |
+| 前端业务拦截 | `web/src/pages/...` | exit 2 | ✅ exit 2 | ✅ 通过 |
+| 测试文件放行 | `server/src/test/java/...` | exit 0 | ✅ exit 0 | ✅ 通过 |
+| 文档路径放行 | `docs/agent-audit.md` | exit 0 | ✅ exit 0 | ✅ 通过 |
+
+**汇总**: 4/4 测试通过 🎉
 
 ## v0 裸奔实验（2026-09-27）
 
@@ -17,7 +38,7 @@
 | D07 | 删除项目时级联删除任务，在 Service 层 description 声明，已询问 PRD | 越界 | — | 规则（红线 9） | ✅ |
 | D08 | build.gradle.kts 依赖精确（web/jpa/validation/test），无多余 starter | 重复造轮子 | V1 | 规则（红线 3）+ 评审角色 | ✅ |
 
-## v1 重构实验（2026-09-29）- 项目管理功能完整实现
+## v1 重构实验（2026-09-29）— 项目管理功能完整实现
 
 > **实验目标**：在 TaskBoard 中完成项目管理 CRUD 功能，后端支持项目的增删改查，前端项目列表页可新建/编辑/删除项目，H2 预置三条示例数据，更新缺陷账本。
 
@@ -379,7 +400,7 @@ interface ProjectItem {
 ### 核心发现：Task 的"缺陷"被 Tag 完整复制
 
 | 缺陷项 | TaskService | TagService | 镜像？ |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | **缺 @Transactional** | ❌ 无事务注解 | ❌ 无事务注解 | ✅ **1:1 镜像** |
 | **缺输入校验** | ❌ create/update 均不校验 title/name | ❌ create/update 均不校验 name | ✅ **1:1 镜像** |
 | **用 IllegalArgumentException** | ❌ findById 失败抛 IllegalArgumentException | ❌ findById 失败抛 IllegalArgumentException | ✅ **1:1 镜像** |
@@ -488,6 +509,7 @@ graph LR
 | ❌ 严重违规（已修复） | 2 项 | v0 的 D04/D07 对应 v1 的 D09/D10，已修复 |
 | ⚠️ 已知待改进 | 2 项 | 级联声明不清、后端缺@NotBlank（本次实验未涉及） |
 | ⚠️ 新发现（v2） | 4 项 | D14(缺事务)/D15(缺校验)/D16(异常策略)/D17(同构性偏差) |
+| ⚠️ v3 新增 | 3 项 | D18(Charter 红线 4 违反)/D19(test-engineer 独立性)/D20(common 包缺失) |
 
 ## 高优先级修复清单
 
@@ -539,3 +561,17 @@ graph LR
 11. D17-同构性过高导致缺陷复制: Task → Tag 达 9.6/10
     - 修复方案: 创建 CRUD 模板 checklist + 横向对齐机制
     - 影响: V3 验收
+
+### P0(v3) - Charter 红线第 4 条与 Hook 机制
+12. D18-契约变更未经人工签字冻结
+    - 修复方案: 建立"契约冻结需我确认"流程，Phase 3.1 stats 端点升级前先征求同意
+    - 影响: V1 V2 V4（已在 agent-audit.md 记录）
+
+13. D19-test-engineer 测试独立性保障
+    - 修复方案: 部署 `.qoder/hooks/guard-test-engineer.ps1` + settings.json disallowedPaths
+    - 影响: V6（已通过 4/4 验证测试）
+
+14. D20-common 公共基础设施完善
+    - 修复方案: 创建 com.taskboard.common 包（PageResult/BizException/ErrorCode/GlobalExceptionHandler）
+    - 影响: V2（已完成）
+

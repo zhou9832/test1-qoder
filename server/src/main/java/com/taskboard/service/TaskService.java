@@ -1,17 +1,18 @@
 package com.taskboard.service;
 
+import com.taskboard.common.BizException;
+import com.taskboard.common.ErrorCode;
 import com.taskboard.dto.CreateTaskRequest;
 import com.taskboard.dto.TaskDto;
 import com.taskboard.dto.TagDto;
+import com.taskboard.dto.TaskTransitionResult;
 import com.taskboard.dto.UpdateTaskRequest;
 import com.taskboard.entity.Task;
 import com.taskboard.entity.Tag;
 import com.taskboard.repository.TaskRepository;
 import com.taskboard.repository.TagRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -82,10 +83,7 @@ public class TaskService {
         if (request.tagIds() != null && !request.tagIds().isEmpty()) {
             List<Tag> tags = tagRepository.findAllById(request.tagIds());
             if (tags.size() != request.tagIds().size()) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, 
-                    "One or more tag IDs not found"
-                );
+                throw new BizException(ErrorCode.PARAM_INVALID, "一个或多个标签ID不存在");
             }
             task.getTags().addAll(tags);
         }
@@ -100,10 +98,7 @@ public class TaskService {
     @Transactional
     public TaskDto updateTask(Long id, UpdateTaskRequest request) {
         Task existing = taskRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND, 
-                "Task not found with id: " + id
-            ));
+            .orElseThrow(() -> new BizException(ErrorCode.PARAM_NOT_FOUND, "任务不存在"));
 
         // Validate and update title
         if (request.title() != null && !request.title().isEmpty()) {
@@ -133,10 +128,7 @@ public class TaskService {
         if (request.tagIds() != null) {
             List<Tag> tags = tagRepository.findAllById(request.tagIds());
             if (tags.size() != request.tagIds().size()) {
-                throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST, 
-                    "One or more tag IDs not found"
-                );
+                throw new BizException(ErrorCode.PARAM_INVALID, "一个或多个标签ID不存在");
             }
             existing.getTags().clear();
             existing.getTags().addAll(tags);
@@ -155,18 +147,22 @@ public class TaskService {
      * CLOSED is terminal state
      */
     @Transactional
-    public TaskDto transitionStatus(Long id, String targetStatus) {
+    public TaskTransitionResult transitionStatus(Long id, String targetStatus) {
         Task task = taskRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND, 
-                "Task not found with id: " + id
-            ));
+            .orElseThrow(() -> new BizException(ErrorCode.PARAM_NOT_FOUND, "任务不存在"));
 
-        validateStateTransition(task.getStatus(), targetStatus);
+        String previousStatus = task.getStatus();
+        
+        if (previousStatus.equals(targetStatus)) {
+            return TaskTransitionResult.of(id, previousStatus, targetStatus);
+        }
+
+        validateStateTransition(previousStatus, targetStatus);
         
         task.setStatus(targetStatus);
-        Task saved = taskRepository.save(task);
-        return toDto(saved);
+        taskRepository.save(task);
+        
+        return TaskTransitionResult.of(id, previousStatus, targetStatus);
     }
 
     /**
@@ -176,10 +172,7 @@ public class TaskService {
     @Transactional
     public void deleteTask(Long id) {
         if (!taskRepository.existsById(id)) {
-            throw new ResponseStatusException(
-                HttpStatus.NOT_FOUND, 
-                "Task not found with id: " + id
-            );
+            throw new BizException(ErrorCode.PARAM_NOT_FOUND, "任务不存在");
         }
         taskRepository.deleteById(id);
     }
@@ -196,49 +189,31 @@ public class TaskService {
 
     private void validateTitle(String title) {
         if (title == null || title.isBlank()) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Task title cannot be blank"
-            );
+            throw new BizException(ErrorCode.PARAM_REQUIRED, "任务标题不能为空");
         }
         if (title.length() > 128) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Task title must be 128 characters or less"
-            );
+            throw new BizException(ErrorCode.PARAM_LENGTH_EXCEEDED, "任务标题不能超过128个字符");
         }
     }
 
     private void validateDescriptionLength(String description) {
         if (description.length() > 1024) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Task description must be 1024 characters or less"
-            );
+            throw new BizException(ErrorCode.PARAM_LENGTH_EXCEEDED, "任务描述不能超过1024个字符");
         }
     }
 
     private void validateStatus(String status) {
         if (status != null && !List.of("TODO", "IN_PROGRESS", "DONE", "CLOSED").contains(status)) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Invalid status: must be TODO, IN_PROGRESS, DONE, or CLOSED"
-            );
+            throw new BizException(ErrorCode.PARAM_INVALID, "无效的状态值：必须为 TODO、IN_PROGRESS、DONE 或 CLOSED");
         }
     }
 
     private void validatePriority(Integer priority) {
         if (priority == null) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Priority cannot be null"
-            );
+            throw new BizException(ErrorCode.PARAM_REQUIRED, "优先级不能为空");
         }
         if (priority < 0 || priority > 3) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Priority must be between 0 and 3"
-            );
+            throw new BizException(ErrorCode.PARAM_INVALID, "优先级必须在 0-3 之间");
         }
     }
 
@@ -246,23 +221,21 @@ public class TaskService {
      * Validate state machine transitions per PRD B.4.
      */
     private void validateStateTransition(String currentStatus, String targetStatus) {
-        if (currentStatus.equals(targetStatus)) {
-            return; // No transition needed
+        // Check terminal state first
+        if ("CLOSED".equals(currentStatus)) {
+            throw new BizException(ErrorCode.TRANSITION_TERMINAL);
         }
 
         boolean valid = switch (currentStatus) {
             case "TODO" -> targetStatus.equals("IN_PROGRESS");
             case "IN_PROGRESS" -> targetStatus.equals("DONE") || targetStatus.equals("TODO");
             case "DONE" -> targetStatus.equals("CLOSED") || targetStatus.equals("IN_PROGRESS");
-            case "CLOSED" -> false; // Terminal state
             default -> false;
         };
 
         if (!valid) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Invalid state transition from " + currentStatus + " to " + targetStatus
-            );
+            throw new BizException(ErrorCode.TRANSITION_ILLEGAL,
+                "不允许从 " + currentStatus + " 直接转移到 " + targetStatus);
         }
     }
 
@@ -273,10 +246,7 @@ public class TaskService {
         try {
             return DateTimeFormatter.ISO_INSTANT.parse(dueAt, Instant::from);
         } catch (Exception e) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST, 
-                "Invalid dueAt format: " + dueAt
-            );
+            throw new BizException(ErrorCode.PARAM_INVALID, "到期时间格式无效");
         }
     }
 

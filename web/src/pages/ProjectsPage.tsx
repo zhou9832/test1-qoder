@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import App from 'antd'
 import { Button, Modal, Space, Table, Typography, message } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, DashboardOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { apiClient } from '../../api/client'
-import { ProjectDto } from '../../api/schema'
-import { PageState } from '../../components/PageState'
+import { useNavigate } from 'react-router-dom'
+import { apiClient } from '../api/client'
+import { ProjectDto } from '../api/schema'
+import { PageState } from '../components/PageState'
 import styles from './ProjectsPage.module.css'
 
 const { confirm } = Modal
@@ -17,6 +17,7 @@ interface ProjectsPageState {
 }
 
 export default function ProjectsPage() {
+  const navigate = useNavigate()
   const [state, setState] = useState<ProjectsPageState>({
     loading: true,
     projects: [],
@@ -129,9 +130,16 @@ export default function ProjectsPage() {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 200,
       render: (_, record) => (
         <Space>
+          <Button
+            type="link"
+            icon={<DashboardOutlined />}
+            onClick={() => navigate(`/projects/${record.id}/board`)}
+          >
+            看板
+          </Button>
           <Button
             type="link"
             icon={<EditOutlined />}

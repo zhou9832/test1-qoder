@@ -1,0 +1,114 @@
+.container {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.board {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  min-height: 500px;
+}
+
+.column {
+  flex: 1;
+  min-width: 240px;
+  max-width: 320px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.columnOver {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.columnDisabled {
+  opacity: 0.6;
+  background: #f0f0f0;
+}
+
+.columnHeader {
+  padding: 12px 16px;
+  font-weight: 600;
+  border-left: 4px solid #d9d9d9;
+  border-radius: 8px 8px 0 0;
+  background: #fff;
+}
+
+.columnBody {
+  padding: 8px;
+  min-height: 200px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.cardDragging {
+  opacity: 0.5;
+}
+
+.cardOverlay {
+  background: #fff;
+  border-radius: 6px;
+  padding: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  max-width: 280px;
+}
+
+.cardTitle {
+  font-weight: 500;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.cardDue {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.emptyColumn {
+  text-align: center;
+  padding: 24px;
+  color: #bfbfbf;
+  font-size: 13px;
+}
+
+.drawerMeta {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.drawerMeta p {
+  margin-bottom: 8px;
+}
+
+.drawerMeta p:last-child {
+  margin-bottom: 0;
+}

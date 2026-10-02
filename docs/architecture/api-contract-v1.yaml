@@ -998,21 +998,20 @@ paths:
 
 ---
 
-### 统计报表（预留端点）
+### 统计报表
 
-#### 按人统计
+#### 按项目统计（by-assignee 端点，无指派人字段时按项目聚合）
 
 ```yaml
   /api/stats/by-assignee:
     get:
-      summary: "按人统计（预留端点）"
+      summary: "按项目统计"
       tags: [Statistics]
       description: |
-        **预留**：无指派人时按项目统计。
-        具体请求参数与响应结构待需求明确后补充。
+        因 Task 实体无 assignee 字段，按项目聚合任务数与工时。
       responses:
         '200':
-          description: "统计成功（结构待定义）"
+          description: "统计成功"
           content:
             application/json:
               schema:
@@ -1020,12 +1019,30 @@ paths:
                   - $ref: '#/components/schemas/ApiResponse'
                   - properties:
                       data:
-                        type: object
-                        description: "占位结构，实际随需求明确"
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            projectId:
+                              type: integer
+                              format: int64
+                            projectName:
+                              type: string
+                            taskCount:
+                              type: integer
+                              description: "该项目的任务数"
+                            totalHours:
+                              type: integer
+                              description: "该项目下任务的累计工时（分钟）"
+                          required: [projectId, projectName, taskCount, totalHours]
               example:
                 code: 0
                 message: Success
-                data: {}
+                data:
+                  - projectId: 1
+                    projectName: 教程研发
+                    taskCount: 5
+                    totalHours: 525
 ```
 
 #### 按周统计

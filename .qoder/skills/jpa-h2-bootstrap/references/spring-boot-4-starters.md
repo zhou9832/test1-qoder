@@ -1,0 +1,1 @@
+Spring Boot 4 模块化 starter 清单 + 本项目已用/可用范围。

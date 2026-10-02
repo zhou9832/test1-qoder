@@ -32,3 +32,13 @@ CREATE TABLE IF NOT EXISTS task_tags (
     CONSTRAINT fk_task_tags_task FOREIGN KEY (task_id) REFERENCES task(id),
     CONSTRAINT fk_task_tags_tag FOREIGN KEY (tag_id) REFERENCES tag(id)
 );
+
+CREATE TABLE IF NOT EXISTS timelog (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_id BIGINT NOT NULL,
+    hours VARCHAR(32) NOT NULL,
+    work_date DATE NOT NULL,
+    note VARCHAR(256),
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_timelog_task FOREIGN KEY (task_id) REFERENCES task(id) ON DELETE CASCADE
+);

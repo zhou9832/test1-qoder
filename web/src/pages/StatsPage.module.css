@@ -1,0 +1,24 @@
+.container {
+  padding: 16px;
+}
+
+.summaryRow {
+  margin-bottom: 16px;
+}
+
+.chartsRow {
+  margin-top: 16px;
+}
+
+.chartCard {
+  min-height: 360px;
+}
+
+.emptyChart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 280px;
+  color: #bfbfbf;
+  font-size: 14px;
+}
