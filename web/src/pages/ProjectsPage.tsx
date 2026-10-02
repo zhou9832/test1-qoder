@@ -25,6 +25,7 @@ function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [empty, setEmpty] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null)
   const [form] = Form.useForm()
@@ -33,11 +34,16 @@ function ProjectsPage() {
   const fetchProjects = async () => {
     setLoading(true)
     setError(null)
+    setEmpty(false)
     try {
       const response = await fetch('/api/projects')
       const data = await response.json()
-      if (data.code === 200) {
-        setProjects(data.data || [])
+      if (data.code === 0) {
+        const projectList = data.data || []
+        setProjects(projectList)
+        if (projectList.length === 0) {
+          setEmpty(true)
+        }
       } else {
         const errorMsg = data.message || '获取项目列表失败'
         setError(errorMsg)
@@ -81,7 +87,7 @@ function ProjectsPage() {
         method: 'DELETE'
       })
       const data = await response.json()
-      if (data.code === 200) {
+      if (data.code === 0) {
         message.success('删除成功')
         fetchProjects()
       } else {
@@ -119,7 +125,7 @@ function ProjectsPage() {
       }
 
       const data = await response.json()
-      if (data.code === 200) {
+      if (data.code === 0) {
         message.success(editingProject ? '更新成功' : '创建成功')
         setModalVisible(false)
         fetchProjects()
@@ -209,7 +215,7 @@ function ProjectsPage() {
 
       {error && (
         <Alert
-          message="错误"
+          message="加载失败"
           description={error}
           type="error"
           showIcon
@@ -219,8 +225,14 @@ function ProjectsPage() {
         />
       )}
 
-      {(loading || !error) && projects.length === 0 && (
-        <Typography.Text type="secondary">暂无项目数据</Typography.Text>
+      {!loading && !error && empty && (
+        <Alert
+          message="暂无项目"
+          description="还没有任何项目，点击下方按钮创建第一个项目。"
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
       )}
 
       <Table

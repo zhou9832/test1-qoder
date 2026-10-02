@@ -3,7 +3,7 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-09-27T07:31:17Z"
+exported_at: "2026-09-29T07:34:31Z"
 modules:
     "":
         dir_name: TaskBoard Monorepo 根目录
@@ -20,8 +20,8 @@ modules:
         depends_on: []
         related_to: []
     docs:
-        dir_name: TaskBoard 项目文档（PRD 与缺陷账本）
-        title: TaskBoard 项目文档（PRD 与缺陷账本）
+        dir_name: TaskBoard 项目文档与质量审计
+        title: TaskBoard 项目文档与质量审计
         scope:
             - docs/
         source_files: []
@@ -29,8 +29,8 @@ modules:
         depends_on: []
         related_to: []
     server:
-        dir_name: TaskBoard Spring Boot 服务端
-        title: TaskBoard Spring Boot 服务端
+        dir_name: TaskBoard Spring Boot 后端服务
+        title: TaskBoard Spring Boot 后端服务
         scope:
             - server/
         source_files: []
@@ -39,8 +39,8 @@ modules:
         related_to:
             - path: web
     web:
-        dir_name: TaskBoard Web 前端应用
-        title: TaskBoard Web 前端应用
+        dir_name: TaskBoard Web 前端（Vite + React + Ant Design）
+        title: TaskBoard Web 前端（Vite + React + Ant Design）
         scope:
             - web/
         source_files: []
