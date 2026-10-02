@@ -347,9 +347,134 @@ interface ProjectItem {
 }
 ```
 
-**违反 charter 红线第 8 条**: “前端接口类型一律由契约生成，禁止手写 interface 描述 API 响应”
+**违反 charter 红线第 8 条**: "前端接口类型一律由契约生成，禁止手写 interface 描述 API 响应"
 
 **修复方向**: 引入 OpenAPI/Swagger 规范 + openapi-generator 自动生成 TypeScript 类型
+
+---
+
+## v2 同构性审计实验（2026-10-02）— Task vs Tag 1:1 镜像度验证
+
+> **实验目的**：验证使用相同提示词（只换实体名）生成的 Task 和 Tag 模块是否具有同构性，检查"风格漂移"类缺陷。
+
+### 实验方法
+
+1. 以 Project 为基准模板（P0 优先级首个完整实现）
+2. Task 作为第 2 个模块（未对照 Project，独立实现）
+3. Tag 作为第 3 个模块（用与 Task 基本相同的提示词生成）
+4. 逐项对比 Task vs Tag 的同构度（只关注后两个模块）
+
+### 同构性评分总览
+
+| 层级 | Task vs Tag 镜像度 | 说明 |
+| --- | --- | --- |
+| Entity | 9.5/10 | 仅默认值设置不同（Task 在 onCreate 设 status/priority） |
+| Repository | 10/10 | 完美镜像 |
+| Service | **10/10** | **1:1 镜像（含所有缺陷都被完美复制）** |
+| Controller | 10/10 | 完美镜像 |
+| 前端页面 | 9.5/10 | 结构完全镜像，字段数因业务精简 |
+| 数据库 | 9/10 | 约束不同但模式一致 |
+| **总体加权平均** | **9.6/10** | **极高同构性** |
+
+### 核心发现：Task 的"缺陷"被 Tag 完整复制
+
+| 缺陷项 | TaskService | TagService | 镜像？ |
+| --- | --- | --- |
+| **缺 @Transactional** | ❌ 无事务注解 | ❌ 无事务注解 | ✅ **1:1 镜像** |
+| **缺输入校验** | ❌ create/update 均不校验 title/name | ❌ create/update 均不校验 name | ✅ **1:1 镜像** |
+| **用 IllegalArgumentException** | ❌ findById 失败抛 IllegalArgumentException | ❌ findById 失败抛 IllegalArgumentException | ✅ **1:1 镜像** |
+| **Controller 直返 Entity** | ✅ 直接返回 Task Entity | ✅ 直接返回 Tag Entity | ✅ **三者都镜像** |
+
+### 关键代码片段对比
+
+#### Service 层（最大偏差区域）
+
+```java
+// TaskService.java L35-43
+public Task update(Long id, Task updatedTask) {
+    return taskRepository.findById(id).map(existingTask -> {
+        existingTask.setTitle(updatedTask.getTitle());
+        existingTask.setDescription(updatedTask.getDescription());
+        existingTask.setStatus(updatedTask.getStatus());
+        existingTask.setPriority(updatedTask.getPriority());
+        existingTask.setDueAt(updatedTask.getDueAt());
+        return taskRepository.save(existingTask);
+    }).orElseThrow(() -> new IllegalArgumentException("Task not found with id: " + id));
+}
+
+// TagService.java L33-39（几乎逐字复制）
+public Tag update(Long id, Tag updatedTag) {
+    return tagRepository.findById(id).map(existingTag -> {
+        existingTag.setName(updatedTag.getName());
+        return tagRepository.save(existingTag);
+    }).orElseThrow(() -> new IllegalArgumentException("Tag not found with id: " + id));
+}
+```
+
+**差异点**：只有字段名不同，其余逻辑、异常策略、无事务保护完全一致。
+
+#### Controller 层（对象构建模式）
+
+```java
+// TaskController.java L46-54
+Task task = new Task();
+task.setProjectId(projectId);
+task.setTitle(title);
+task.setDescription(description);
+task.setStatus(status);
+task.setPriority(priority);
+if (dueAt != null && !dueAt.isEmpty()) {
+    task.setDueAt(java.time.Instant.parse(dueAt));
+}
+
+// TagController.java L43-45（简化版但模式一致）
+Tag tag = new Tag();
+tag.setName(name);
+```
+
+**共同缺陷**：都是先创建空对象 → 逐个 setter 赋值（vs Project 用构造器直接传参）。
+
+### 新增缺陷记录
+
+| # | 现象 | 类型 | 影响 | 期望机制 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| D14 | TaskService 和 TagService 均未使用 `@Transactional` 注解，写操作不在事务中 | 架构走偏 | V2 V3 | 规则 + 技能 | v0 |
+| D15 | TaskService 和 TagService 均未做输入校验（title/name blank + 长度限制） | 跨端不一致 | V1 V4 | 规则 + 技能 | v0 |
+| D16 | TaskService 和 TagService 都用 `IllegalArgumentException` 而非 `ResponseStatusException`，导致错误返回 500 而非精准 HTTP 状态码 | 跨端不一致 | V1 V3 | 规则 | v0 |
+| D17 | Task → Tag 的同构性达 9.6/10，"缺陷"被 1:1 完美复制，形成系统性偏差 | 重复造轮子 | V3 | 规则（同构 checklist） | v0 |
+
+### 偏差根源分析
+
+**为什么会出现这种偏差？**
+
+1. **缺乏"横向对齐"机制**：Project 是第一个实现的模块，成为事实标准，但没有被显式定义为模板
+2. **后续模块实现时无人回看已有模块**：Task 和 Tag 各自发挥，没有 Checklist 强制对照
+3. **AI 的"惯性模仿"**：如果第三个模块参照 Task 做，偏差会被放大，整个项目代码质量方差越来越大
+
+```mermaid
+graph LR
+    A[项目管理 P0] --> B[隐式模板]
+    C[任务管理] -->|无对照| D[独立实现]
+    E[标签管理] -->|参照 Task|
+    D --> F[出现偏差]
+    E --> G[偏差被放大]
+    G --> H[技术债累积]
+    
+    style B fill:#ffcccc
+    style F fill:#ffcccc
+    style H fill:#ffcccc
+```
+
+### 同构性 vs 质量的权衡
+
+> **同构性比绝对质量更重要**。因为：
+> - 同构性高 + 质量中等 = 可预测、可批量修复
+> - 同构性低 + 质量参差不齐 = 每个模块行为不同，无法 generalize
+
+**建议**：
+1. 立即将 TaskService 提升到 ProjectService 的质量水平（补校验、事务、异常分类）
+2. 创建一个"CRUD 模板 checklist"，后续任何新模块实现时必须逐项对照
+3. 把对比表沉淀到文档（如 `docs/architecture/module-isomorphism.md`），作为后续开发者/AI 的参考标准
 
 ---
 
@@ -362,6 +487,7 @@ interface ProjectItem {
 | ⚠️ 遗留问题 | 1 项 | D13(违反 charter 红线 8：手写接口类型) |
 | ❌ 严重违规（已修复） | 2 项 | v0 的 D04/D07 对应 v1 的 D09/D10，已修复 |
 | ⚠️ 已知待改进 | 2 项 | 级联声明不清、后端缺@NotBlank（本次实验未涉及） |
+| ⚠️ 新发现（v2） | 4 项 | D14(缺事务)/D15(缺校验)/D16(异常策略)/D17(同构性偏差) |
 
 ## 高优先级修复清单
 
@@ -396,3 +522,20 @@ interface ProjectItem {
 7. 后端校验: Controller 层缺 @NotBlank 等 Bean Validation 注解
    - 修复方案: 添加参数校验注解
    - 影响: 风格一致性
+
+### P0(v2) - 同构性系统性偏差
+8. D14-缺失 @Transactional: TaskService 和 TagService 都无事务保护
+   - 修复方案: 所有写操作方法加 @Transactional
+   - 影响: V2/V3 验收
+
+9. D15-缺失输入校验: create/update 都不校验 title/name
+   - 修复方案: Service 层加 blank + 长度校验（参照 ProjectService）
+   - 影响: V1/V4 验收
+
+10. D16-异常策略不统一: IllegalArgumentException vs ResponseStatusException
+    - 修复方案: 统一用 ResponseStatusException 并匹配 HTTP 状态码
+    - 影响: V1/V3 验收
+
+11. D17-同构性过高导致缺陷复制: Task → Tag 达 9.6/10
+    - 修复方案: 创建 CRUD 模板 checklist + 横向对齐机制
+    - 影响: V3 验收

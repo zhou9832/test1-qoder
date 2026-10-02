@@ -14,6 +14,12 @@
 - [ProjectControllerTest.java](file://server/src/test/java/com/taskboard/controller/ProjectControllerTest.java)
 </cite>
 
+## 更新摘要
+**变更内容**
+- ApiResponse成功响应码从200标准化为0，统一了API响应码规范
+- 改进了错误处理模式和一致的API响应码设计
+- 更新了相关章节以反映新的响应码标准
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -30,9 +36,9 @@
 本章节面向TaskBoard后端API控制器层，聚焦RESTful设计原则在HealthController和ProjectController中的落地实践。文档从HTTP方法选择、URL路径设计、状态码使用入手，完整梳理从HTTP请求接收到响应返回的处理链路；解析@RestContoller与@RequestMapping注解的使用方式与最佳实践；说明参数绑定、数据验证与异常处理机制；并给出API版本控制、请求拦截器与中间件的设计理念，以及开发新API端点的规范与参考路径。
 
 **更新摘要**
-- 新增ProjectController实现项目的完整CRUD操作
-- 扩展RESTful API设计原则到项目管理领域
-- 增强异常处理和业务逻辑验证机制
+- ApiResponse成功响应码已标准化为0，替代原来的200
+- 统一的API响应码设计提升了前后端契约的一致性
+- 增强了错误处理模式和业务逻辑验证机制
 
 ## 项目结构
 本项目采用前后端分离的Monorepo结构，后端基于Spring Boot 4（Java 25），前端为React 19。后端服务默认监听8080端口，所有API统一以/api为前缀暴露。健康检查接口位于controller包下，项目管理API同样位于controller包中，统一的响应体封装在dto包中。
@@ -42,7 +48,7 @@ graph TB
 subgraph "后端(server)"
 A["HealthController<br/>/api/health"]
 B["ProjectController<br/>/api/projects"]
-C["ApiResponse<T><br/>统一响应体"]
+C["ApiResponse<T><br/>统一响应体<br/>成功码: 0"]
 D["Project实体<br/>JPA映射"]
 E["ProjectService<br/>业务逻辑"]
 F["ProjectRepository<br/>数据访问"]
@@ -76,7 +82,7 @@ A -.-> G
 ## 核心组件
 - HealthController：提供健康检查REST端点，遵循REST语义，使用GET方法访问资源，返回标准JSON响应体。
 - ProjectController：提供项目管理的完整RESTful API，包括获取所有项目、创建项目、获取单个项目、更新项目和删除项目。
-- ApiResponse：统一响应包装类，包含code、message、data字段，便于客户端一致化处理。
+- ApiResponse：统一响应包装类，包含code、message、data字段，成功响应码标准化为0，便于客户端一致化处理。
 - Project实体：JPA实体类，映射数据库project表，包含项目的基本信息和时间戳。
 - ProjectService：业务逻辑层，处理项目相关的业务规则和事务管理。
 - ProjectRepository：数据访问层，继承JpaRepository提供基础CRUD操作和自定义查询方法。
@@ -107,9 +113,9 @@ Controller->>Service : "createProject(name, description)"
 Service->>Repo : "save(project)"
 Repo-->>Service : "保存的项目对象"
 Service-->>Controller : "返回项目对象"
-Controller->>Resp : "构造成功响应体 ApiResponse.success(...)"
+Controller->>Resp : "构造成功响应体 ApiResponse.success(...)<br/>code=0"
 Controller-->>SpringMVC : "ResponseEntity.ok(Resp)"
-SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
+SpringMVC-->>Client : "200 OK + JSON {code : 0,message,data}"
 ```
 
 图表来源
@@ -127,7 +133,7 @@ SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
   - 根路径由application.properties的context-path决定为"/"，控制器级前缀为"/api"，具体资源为"/health"，最终路径为"/api/health"。
 - 状态码使用
   - 通过ResponseEntity.ok(...)返回200 OK，表示请求成功。
-  - 业务状态码由ApiResponse.code表达，当前成功场景为200。
+  - 业务状态码由ApiResponse.code表达，**更新**成功场景现在统一为0，而非之前的200。
 
 章节来源
 - [HealthController.java:14-26](file://server/src/main/java/com/taskboard/controller/HealthController.java#L14-L26)
@@ -150,8 +156,9 @@ SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
   - 404 Not Found：资源不存在
   - 400 Bad Request：参数验证失败
   - 409 Conflict：资源冲突（如重复名称）
+  - **更新** 业务响应码统一为0表示成功，HTTP状态码与业务状态码分离
 
-**新增** ProjectController实现了完整的RESTful CRUD操作，遵循标准的HTTP语义和状态码约定。
+**更新** ProjectController实现了完整的RESTful CRUD操作，遵循标准的HTTP语义和状态码约定，并使用标准化的成功响应码0。
 
 章节来源
 - [ProjectController.java:27-76](file://server/src/main/java/com/taskboard/controller/ProjectController.java#L27-L76)
@@ -172,7 +179,7 @@ SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
 最佳实践建议
 - 控制器仅负责请求路由与响应组装，业务逻辑下沉至Service层。
 - 使用ResponseEntity显式控制HTTP状态码，增强可观测性与一致性。
-- 统一响应体封装于ApiResponse，保证前后端契约稳定。
+- 统一响应体封装于ApiResponse，保证前后端契约稳定，**更新**成功响应码统一为0。
 - 在Service层进行业务验证和异常处理，保持控制器简洁。
 
 章节来源
@@ -193,7 +200,7 @@ SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
   - 建议在全局使用@ControllerAdvice + @ExceptionHandler统一捕获并转换为ApiResponse错误格式
   - 对未找到资源、参数非法、权限不足等分别返回合适的HTTP状态码（404、400、403等）
 
-**更新** ProjectController引入了更完善的参数绑定和异常处理机制，包括路径变量、可选参数和业务验证。
+**更新** ProjectController引入了更完善的参数绑定和异常处理机制，包括路径变量、可选参数和业务验证，并使用标准化的成功响应码0。
 
 章节来源
 - [ProjectController.java:38-44](file://server/src/main/java/com/taskboard/controller/ProjectController.java#L38-L44)
@@ -215,7 +222,7 @@ SpringMVC-->>Client : "200 OK + JSON {code,message,data}"
   - 适合更底层的请求预处理：CORS、编码、安全头设置等。
 - 建议
   - 将鉴权、限流、灰度等能力抽象为可插拔组件，按需要装配。
-  - 与统一响应体结合，确保错误信息标准化输出。
+  - 与统一响应体结合，确保错误信息标准化输出，**更新**成功响应码统一为0。
 
 [本节为通用设计说明，不直接分析具体代码文件]
 
@@ -259,9 +266,9 @@ class Project {
 +Instant createdAt
 +Instant updatedAt
 }
-HealthController --> ApiResponse : "构造响应体"
+HealthController --> ApiResponse : "构造响应体<br/>code=0"
 ProjectController --> ProjectService : "业务逻辑调用"
-ProjectController --> ApiResponse : "构造响应体"
+ProjectController --> ApiResponse : "构造响应体<br/>code=0"
 ProjectService --> ProjectRepository : "数据访问"
 ProjectService --> Project : "业务对象"
 ProjectRepository --> Project : "JPA实体"
@@ -286,7 +293,7 @@ ProjectRepository --> Project : "JPA实体"
 - 在高并发场景下，可通过连接池、线程池与缓存优化后续复杂接口。
 - 使用@Transactional确保数据一致性，但需注意事务边界避免过长事务。
 
-**更新** ProjectService引入了事务管理和优化的查询方法，提升了数据操作的可靠性和性能。
+**更新** ProjectService引入了事务管理和优化的查询方法，提升了数据操作的可靠性和性能，同时使用标准化的成功响应码0减少了响应体大小。
 
 [本节为通用性能建议，不直接分析具体代码文件]
 
@@ -296,15 +303,15 @@ ProjectRepository --> Project : "JPA实体"
 - 路径错误
   - 确认请求路径是否包含正确的上下文路径与控制器前缀，即"/api/health"或"/api/projects"。
 - 响应体不一致
-  - 确认客户端期望的code/message/data字段是否与ApiResponse定义一致。
+  - 确认客户端期望的code/message/data字段是否与ApiResponse定义一致，**更新**成功响应码应为0而非200。
 - 单元测试失败
-  - 使用MockMvc复现问题，核对断言：状态码、JSON路径与字段值。
+  - 使用MockMvc复现问题，核对断言：状态码、JSON路径与字段值，**更新**注意code字段断言应为0。
 - 项目操作异常
   - 检查项目名称唯一性约束，避免重复名称导致409冲突。
   - 验证参数长度限制，确保名称不超过64字符，描述不超过512字符。
   - 确认项目ID存在性，避免404未找到错误。
 
-**更新** 新增了项目相关API的故障排查指导，包括参数验证和资源存在性检查。
+**更新** 新增了项目相关API的故障排查指导，包括参数验证和资源存在性检查，以及成功响应码标准化为0的注意事项。
 
 章节来源
 - [application.properties:1-2](file://server/src/main/resources/application.properties#L1-L2)
@@ -312,7 +319,7 @@ ProjectRepository --> Project : "JPA实体"
 - [ProjectControllerTest.java:43-114](file://server/src/test/java/com/taskboard/controller/ProjectControllerTest.java#L43-L114)
 
 ## 结论
-HealthController和ProjectController共同构成了TaskBoard的后端API控制器层，以简洁的方式实现了RESTful健康检查和项目管理系统。两个控制器都遵循了清晰的HTTP语义、合理的URL设计与一致的状态码约定。通过统一响应体ApiResponse，保证了前后端契约的一致性。ProjectController的引入完善了系统的CRUD功能，展现了完整的RESTful API设计模式。后续可在该基础上扩展更多业务端点，并引入全局异常处理、参数校验、API版本化与拦截器等工程化能力，提升系统的可维护性与可观测性。
+HealthController和ProjectController共同构成了TaskBoard的后端API控制器层，以简洁的方式实现了RESTful健康检查和项目管理系统。两个控制器都遵循了清晰的HTTP语义、合理的URL设计与一致的状态码约定。**更新**通过统一响应体ApiResponse的成功响应码标准化为0，保证了前后端契约的一致性和API设计的规范性。ProjectController的引入完善了系统的CRUD功能，展现了完整的RESTful API设计模式。后续可在该基础上扩展更多业务端点，并引入全局异常处理、参数校验、API版本化与拦截器等工程化能力，提升系统的可维护性与可观测性。
 
 [本节为总结性内容，不直接分析具体代码文件]
 
@@ -326,24 +333,20 @@ HealthController和ProjectController共同构成了TaskBoard的后端API控制�
   - PUT/PATCH：更新资源（全量/增量）
   - DELETE：删除资源
 - 状态码
-  - 200/201/204：成功
-  - 400：参数错误
-  - 401/403：认证/授权失败
-  - 404：资源不存在
-  - 409：资源冲突
-  - 500：服务器内部错误
+  - HTTP状态码：200/201/204表示成功，400/401/403/404/409/500表示各类错误
+  - **更新** 业务响应码：0表示成功，其他数值表示具体业务错误
 - 请求体与响应体
   - 入参使用DTO并配合@Valid校验
-  - 出参统一使用ApiResponse<T>封装
+  - 出参统一使用ApiResponse<T>封装，**更新**成功响应code字段固定为0
 - 版本控制
   - 通过URL路径版本化：/api/v1/...
 - 示例（概念性步骤）
   - 新建DTO：定义字段与校验规则
   - 新建Controller：使用@RestController与@RequestMapping标注
   - 编写方法：使用@GetMapping/@PostMapping等映射HTTP方法
-  - 组装响应：使用ApiResponse.success/error
-  - 编写测试：使用MockMvc断言状态码与JSON字段
+  - 组装响应：使用ApiResponse.success/error，**更新**成功响应自动使用code=0
+  - 编写测试：使用MockMvc断言状态码与JSON字段，**更新**注意code字段断言应为0
 
-**更新** 新增了409状态码用于资源冲突场景，这是ProjectController中重复名称处理的典型应用。
+**更新** 新增了业务响应码标准化的重要规范，成功响应统一使用code=0，这是ApiResponse标准化设计的关键特性。
 
 [本节为通用规范与步骤说明，不直接分析具体代码文件]

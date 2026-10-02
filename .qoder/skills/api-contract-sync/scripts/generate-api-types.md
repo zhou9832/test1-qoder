@@ -1,0 +1,1 @@
+读后端导出的 openapi.yaml → 调 openapi-typescript → 输出 web/src/api/schema.d.ts

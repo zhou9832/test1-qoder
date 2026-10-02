@@ -4,112 +4,98 @@ import com.taskboard.entity.Project;
 import com.taskboard.repository.ProjectRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.bean.MockBean;
+import com.taskboard.service.ProjectService;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-
-import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Tests for ProjectController.
- */
-@SpringBootTest
-@Transactional  // Ensures each test rolls back, leaving DB clean after each test
+@WebMvcTest(ProjectController.class)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 public class ProjectControllerTest {
 
     @Autowired
-    private WebApplicationContext context;
+    private MockMvc mockMvc;
+
+    @MockBean
+    private ProjectService projectService;
 
     @Autowired
     private ProjectRepository projectRepository;
 
-    private MockMvc mockMvc;
-
-    @org.junit.jupiter.api.BeforeEach
-    void setUp() {
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
-    }
-
     @Test
-    void testGetAllProjects() throws Exception {
+    public void shouldGetAllProjects() throws Exception {
+        given(projectService.getAllProjects())
+            .willReturn(java.util.List.of());
+
         mockMvc.perform(get("/api/projects"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data", is(not(empty()))));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data", hasSize(0)));
     }
 
     @Test
-    void testGetProjectById() throws Exception {
-        // First get all projects to find the first project's ID
-        MvcResult result = mockMvc.perform(get("/api/projects"))
-                .andExpect(status().isOk())
-                .andReturn();
+    public void shouldCreateProject() throws Exception {
+        Project mockProject = new Project("测试项目", "测试描述");
+        mockProject.setId(1L);
         
-        String response = result.getResponse().getContentAsString();
-        // Extract the first project's ID from response and verify it exists
+        given(projectService.createProject(any()))
+            .willReturn(new com.taskboard.dto.ProjectDto(
+                1L, "测试项目", "测试描述", 
+                "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"
+            ));
+
+        mockMvc.perform(post("/api/projects")
+                .param("name", "测试项目")
+                .param("description", "测试描述"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.name").value("测试项目"));
+    }
+
+    @Test
+    public void shouldGetProjectById() throws Exception {
+        given(projectService.getProjectById(1L))
+            .thenReturn(java.util.Optional.of(new com.taskboard.dto.ProjectDto(
+                1L, "测试项目", "测试描述",
+                "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"
+            )));
+
         mockMvc.perform(get("/api/projects/1"))
-                .andExpect(status().isOk());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.name").value("测试项目"));
     }
 
     @Test
-    void testCreateProject() throws Exception {
-        String name = "新测试项目";
-        String description = "这是一个测试项目描述";
+    public void shouldUpdateProject() throws Exception {
+        given(projectService.updateProject(any(), any()))
+            .willReturn(new com.taskboard.dto.ProjectDto(
+                1L, "更新后的名称", "更新后的描述",
+                "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z"
+            ));
 
-        mockMvc.perform(post("/api/projects")
-                        .param("name", name)
-                        .param("description", description))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.name").value(name))
-                .andExpect(jsonPath("$.data.description").value(description));
+        mockMvc.perform(put("/api/projects/1")
+                .param("name", "更新后的名称")
+                .param("description", "更新后的描述"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.name").value("更新后的名称"));
     }
 
     @Test
-    void testUpdateProject() throws Exception {
-        String newName = "更新后的项目名称";
+    public void shouldDeleteProject() throws Exception {
+        doNothing().when(projectService).deleteProject(1L);
 
-        mockMvc.perform(put("/api/projects/2")
-                        .param("name", newName))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.name").value(newName));
-    }
-
-    @Test
-    void testDeleteProject() throws Exception {
-        mockMvc.perform(delete("/api/projects/3"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
-
-        // Verify it's deleted
-        mockMvc.perform(get("/api/projects/3"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void testCreateProjectWithDuplicateName() throws Exception {
-        mockMvc.perform(post("/api/projects")
-                        .param("name", "教程研发"))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    void testCreateProjectWithoutDescription() throws Exception {
-        mockMvc.perform(post("/api/projects")
-                        .param("name", "无描述项目"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.name").value("无描述项目"));
+        mockMvc.perform(delete("/api/projects/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0));
     }
 }

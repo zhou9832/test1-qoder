@@ -1,5 +1,8 @@
 package com.taskboard.service;
 
+import com.taskboard.dto.CreateProjectRequest;
+import com.taskboard.dto.ProjectDto;
+import com.taskboard.dto.UpdateProjectRequest;
 import com.taskboard.entity.Project;
 import com.taskboard.repository.ProjectRepository;
 import org.springframework.http.HttpStatus;
@@ -7,10 +10,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Service for Project business logic.
+ * Business logic for Project management.
  */
 @Service
 public class ProjectService {
@@ -24,93 +30,143 @@ public class ProjectService {
     /**
      * Get all projects ordered by creation time descending.
      */
-    public List<Project> getAllProjects() {
-        return projectRepository.findAllByOrderByCreatedAtDesc();
+    @Transactional(readOnly = true)
+    public List<ProjectDto> getAllProjects() {
+        return projectRepository.findAllByOrderByCreatedAtDesc().stream()
+            .map(this::toDto)
+            .toList();
     }
 
     /**
-     * Get project by ID.
+     * Get a project by ID.
      */
-    public Project getProjectById(Long id) {
-        return projectRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, 
-                        "Project not found with id: " + id
-                ));
+    @Transactional(readOnly = true)
+    public Optional<ProjectDto> getProjectById(Long id) {
+        return projectRepository.findById(id).map(this::toDto);
     }
 
     /**
-     * Create a new project.
+     * Create a new project with input validation.
      */
     @Transactional
-    public Project createProject(String name, String description) {
-        if (name == null || name.isBlank()) {
+    public ProjectDto createProject(CreateProjectRequest request) {
+        validateProjectName(request.name());
+        
+        if (projectRepository.existsByName(request.name())) {
             throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Project name cannot be blank"
+                HttpStatus.CONFLICT, 
+                "Project name already exists: " + request.name()
             );
         }
 
-        if (projectRepository.existsByName(name)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Project name already exists: " + name
-            );
-        }
+        Project project = new Project();
+        project.setName(request.name().trim());
+        project.setDescription(request.description() != null ? request.description().trim() : "");
+        
+        validateDescriptionLength(project.getDescription());
 
-        Project project = new Project(name, description);
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(project);
+        return toDto(saved);
     }
 
     /**
-     * Update an existing project.
+     * Update an existing project with validation.
      */
     @Transactional
-    public Project updateProject(Long id, String name, String description) {
-        Project project = getProjectById(id);
+    public ProjectDto updateProject(Long id, UpdateProjectRequest request) {
+        Project existing = projectRepository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND, 
+                "Project not found with id: " + id
+            ));
 
-        if (name != null && !name.isBlank()) {
-            if (name.length() > 64) {
+        // Validate name if provided
+        if (request.name() != null && !request.name().isEmpty()) {
+            validateProjectName(request.name());
+            
+            // Check name uniqueness excluding current project
+            if (projectRepository.existsByName(request.name()) 
+                && !request.name().equals(existing.getName())) {
                 throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Project name cannot exceed 64 characters"
+                    HttpStatus.CONFLICT, 
+                    "Project name already exists: " + request.name()
                 );
             }
-            // Check uniqueness only if name changed or same name belongs to different project
-            if (!project.getName().equals(name) && projectRepository.existsByName(name)) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Project name already exists: " + name
-                );
-            }
-            project.setName(name);
+            
+            existing.setName(request.name().trim());
         }
 
-        if (description != null) {
-            if (description.length() > 512) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Project description cannot exceed 512 characters"
-                );
-            }
-            project.setDescription(description);
+        // Update description if provided
+        if (request.description() != null) {
+            String desc = request.description().trim();
+            validateDescriptionLength(desc);
+            existing.setDescription(desc);
         }
 
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(existing);
+        return toDto(saved);
     }
 
     /**
      * Delete a project by ID.
-     * Cascade strategy: deleting project will cascade delete its tasks (defined in domain model).
+     * Cascade strategy: deleting project cascades to its tasks (defined in PRD).
      */
     @Transactional
     public void deleteProject(Long id) {
         if (!projectRepository.existsById(id)) {
             throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Project not found with id: " + id
+                HttpStatus.NOT_FOUND, 
+                "Project not found with id: " + id
             );
         }
         projectRepository.deleteById(id);
+    }
+
+    /**
+     * Check if a project exists by ID.
+     */
+    @Transactional(readOnly = true)
+    public boolean existsById(Long id) {
+        return projectRepository.existsById(id);
+    }
+
+    // Private validation methods
+
+    private void validateProjectName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, 
+                "Project name cannot be blank"
+            );
+        }
+        if (name.length() > 64) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, 
+                "Project name must be 64 characters or less"
+            );
+        }
+    }
+
+    private void validateDescriptionLength(String description) {
+        if (description.length() > 512) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, 
+                "Project description must be 512 characters or less"
+            );
+        }
+    }
+
+    /**
+     * Convert Entity to DTO with ISO-8601 date formatting.
+     */
+    private ProjectDto toDto(Project project) {
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+        return new ProjectDto(
+            project.getId(),
+            project.getName(),
+            project.getDescription(),
+            formatter.format(project.getCreatedAt()),
+            formatter.format(project.getUpdatedAt())
+        );
     }
 }

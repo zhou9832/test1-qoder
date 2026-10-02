@@ -2,14 +2,12 @@ package com.taskboard.repository;
 
 import com.taskboard.entity.Project;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 /**
- * Repository for Project entity operations.
+ * Repository for Project entity.
  */
-@Repository
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     /**

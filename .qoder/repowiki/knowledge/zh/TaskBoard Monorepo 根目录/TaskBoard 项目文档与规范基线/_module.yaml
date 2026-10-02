@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: docs
-title: TaskBoard 项目文档与质量审计
+title: TaskBoard 项目文档与规范基线
 scope:
     - docs/
 source_files: []

@@ -3,7 +3,7 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-09-29T07:34:31Z"
+exported_at: "2026-10-02T07:34:34Z"
 modules:
     "":
         dir_name: TaskBoard Monorepo 根目录
@@ -20,8 +20,8 @@ modules:
         depends_on: []
         related_to: []
     docs:
-        dir_name: TaskBoard 项目文档与质量审计
-        title: TaskBoard 项目文档与质量审计
+        dir_name: TaskBoard 项目文档与规范基线
+        title: TaskBoard 项目文档与规范基线
         scope:
             - docs/
         source_files: []
@@ -39,8 +39,8 @@ modules:
         related_to:
             - path: web
     web:
-        dir_name: TaskBoard Web 前端（Vite + React + Ant Design）
-        title: TaskBoard Web 前端（Vite + React + Ant Design）
+        dir_name: TaskBoard Web 前端应用
+        title: TaskBoard Web 前端应用
         scope:
             - web/
         source_files: []

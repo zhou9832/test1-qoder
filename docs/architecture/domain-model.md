@@ -184,9 +184,9 @@ stateDiagram-v2
 | 实体 | 后端 Entity | Repository | Service | Controller | DTO (待生成) |
 | --- | --- | --- | --- | --- | --- |
 | Project | `server/src/main/java/com/taskboard/entity/Project.java` | `ProjectRepository.java` | `ProjectService.java` | `ProjectController.java` | `project.dto.*` |
-| Task | *(待创建)* | *(待创建)* | *(待创建)* | *(待创建)* | `task.dto.*` |
+| Task | `server/src/main/java/com/taskboard/entity/Task.java` | `TaskRepository.java` | `TaskService.java` | `TaskController.java` | `task.dto.*` (已生成: `web/src/api/schema.d.ts`) |
 | Tag | *(待创建)* | *(待创建)* | *(待创建)* | *(待创建)* | `tag.dto.*` |
 | TimeLog | *(待创建)* | *(待创建)* | *(待创建)* | *(待创建)* | `timelog.dto.*` |
 
-> **注意**：当前仓库仅实现了 Project 实体（见 [Project.java](file:///d:/test/test1-qoder/server/src/main/java/com/taskboard/entity/Project.java)），其他三类实体待后续任务实现。  
+> **注意**：当前仓库已实现了 Project 和 Task 实体（见 [Project.java](file:///d:/test/test1-qoder/server/src/main/java/com/taskboard/entity/Project.java)、[Task.java](file:///d:/test/test1-qoder/server/src/main/java/com/taskboard/entity/Task.java)），其他两类实体待后续任务实现。  
 > 每次修改实体字段前，必须列出三处引用点并等待确认（章程红线 10）。
