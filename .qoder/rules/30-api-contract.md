@@ -6,7 +6,7 @@ description: 当任务涉及新增或修改后端 HTTP 接口的请求/响应结
 
 # 契约优先规则
 
-- OpenAPI 描述文件是唯一事实源，由后端 DTO 注解生成（springdoc），禁止手写契约文件。
+- **docs/architecture/api-contract-v1.yaml 为 TaskBoard 契约先导文件**（人工维护 + 签字冻结），由后端 DTO 注解逐步向 springdoc 对齐。**禁止手写未冻结的契约文件**。
 - 字段增删改名，先改后端定义并让它进契约，再重新生成前端类型，最后改消费代码；
   不得先改代码后补契约。
 - 字段命名 camelCase；时间一律 ISO-8601 带时区偏移（openapi 标 format: date-time）。

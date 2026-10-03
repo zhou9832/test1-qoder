@@ -1,0 +1,58 @@
+# ADR（Architecture Decision Records）模块
+
+> **决策理由查询**：当用户提问"为什么这么设计"时，优先从本模块返回答案，而非仅展示代码实现。
+
+---
+
+## 知识卡片
+
+### ADR-001：H2 内存库选型
+- **状态**：已采纳
+- **核心决策**：零运维教学数据库，用 schema.sql + data.sql 管理
+- **后果链**：重启丢数据 → 需预置示例数据 → SQL 方言差异需验证
+- **参考**：[完整文档](../../docs/architecture/adr-001-h2-inmemory.md) | [章程第 7 条红线](../../../.qoder/rules/00-project-charter.md#L12-L13)
+
+### ADR-002：契约优先，前端类型由 OpenAPI 生成
+- **状态**：已采纳
+- **核心决策**：人工维护契约 YAML + 签字冻结 → 前端自动生成类型
+- **后果链**：消灭 D02 漂移 → 需串行生成 schema.d.ts → 契约是业务决策非技术决策
+- **参考**：[完整文档](../../docs/architecture/adr-002-contract-first.md) | [缺陷 D02](../../../docs/rule-audit.md)
+
+### ADR-003：引入 zod 做前端运行时校验
+- **状态**：已采纳
+- **核心决策**：TypeScript 编译后类型蒸发 → 运行时强制校验
+- **后果链**：契约守门 → 增加 bundle ~15KB → 校验逻辑仅限 api-client.ts
+- **参考**：[完整文档](../../docs/architecture/adr-003-zod-runtime-validation.md) | [Charter 白名单](../../../.qoder/rules/00-project-charter.md#L18-L21)
+
+### ADR-004：状态变更走 transitions 动作端点
+- **状态**：已采纳
+- **核心决策**：专用 POST /transitions 端点封装状态机校验
+- **后果链**：防止非法流转 → 多一类端点抽象 → Service 层 switch-case 覆盖
+- **参考**：[完整文档](../../docs/architecture/adr-004-transitions-actions.md) | [领域模型](../../docs/architecture/domain-model.md#d02---tag-全局共享不属于项目)
+
+### ADR-005：test-engineer 独立性用 Hook 兜底
+- **状态**：已采纳
+- **核心决策**：文件系统级拦截（disallowedPaths）+ PreToolUse Hook
+- **后果链**：确定性隔离 → 维护负担 → 可临时提升权限修复 Bug
+- **参考**：[完整文档](../../docs/architecture/adr-005-test-engineer-hook-isolation.md) | [冒烟测试结果](../../../docs/agent-audit.md)
+
+---
+
+## 使用场景
+
+| 用户问题 | 推荐 ADR | 回答方向 |
+|---------|---------|---------|
+| "为什么用 H2 不用 PostgreSQL？" | ADR-001 | 教学聚焦智能体规范，不纠缠运维；迁移需重审 |
+| "前端能手写接口类型吗？" | ADR-002 | 禁止！契约先导消灭漂移，违反即 Charter 第 8 条红线 |
+| "为什么用 zod 而不用 class-validator？" | ADR-003 | TS 原生、生态匹配、运行时强制校验 |
+| "状态变更为什么不能直接 PUT？" | ADR-004 | 四态状态机需特殊校验，防止非法流转 |
+| "test-engineer 能改业务代码吗？" | ADR-005 | 绝对不能！Hook 机制文件系统级拦截 |
+
+---
+
+## ADR 维护规则
+
+1. **新建 ADR**：重大架构变动前，先写草案 → 人工审批 → 正式化
+2. **更新 ADR 状态**：`已采纳` → `Superseded`（被 XXX 取代），不删除旧文件
+3. **引用 ADR**：SKILL.md/agent 配置中必须引用相关 ADR（如 `api-contract-sync` 引用 ADR-002）
+4. **审计频率**：每个迭代末检查 ADR 是否仍然适用

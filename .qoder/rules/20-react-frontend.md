@@ -23,6 +23,6 @@ globs: "web/src/**/*.{ts,tsx}"
 - 不引入 v5 兼容包与 v6 已移除组件（List / BackTop / Dropdown.Button）。
 
 ## 目录与命名
-- 页面目录结构固定：pages/<domain>/{index.tsx, components/, hooks/}。
+- 页面目录结构固定：pages/<domain>/{index.tsx, components/, hooks/}；**当前规模（≤15 页面）可采用扁平结构；当页面数超过 15 时考虑按域拆分**。
 - 事件处理函数命名 onXxx；布尔变量命名 isXxx / hasXxx。
-- 路由集中声明在 router.tsx，禁止页面内自行拼装路径常量。
+- 路由集中声明在 App.tsx（实际位置），禁止页面内自行拼装路径常量。

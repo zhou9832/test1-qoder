@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-10-02T09:04:10Z"
+exported_at: "2026-10-03T06:05:02Z"
 modules:
     "":
-        dir_name: TaskBoard Monorepo 根
-        title: TaskBoard Monorepo 根
+        dir_name: TaskBoard Monorepo 根目录
+        title: TaskBoard Monorepo 根目录
         scope:
             - README.md
             - INIT_REPORT.md
