@@ -1,3 +1,11 @@
+基于我的分析，我现在了解了变更的上下文。根据更新原因和代码检查，主要变更是：
+
+1. 清理了控制器层中的非法Entity导入
+2. 移除了违反分层架构规则的端点（如StatsController中的`/tasks-quick`端点）
+3. 确保了"Entity不得出现在controller方法签名"的规则得到严格遵守
+
+现在我将更新API控制器层文档，重点强调这一架构约束的严格执行：
+
 # API控制器层
 
 <cite>
@@ -44,11 +52,10 @@
 
 ## 更新摘要
 **变更内容**
-- 新增TimeLogController和StatsController，实现工时统计和报表功能
-- 增强错误处理基础设施，引入BizException、ErrorCode和GlobalExceptionHandler
-- TaskController新增状态转换端点(/tasks/{id}/transitions)，支持复杂的状态机验证
-- 统一分页响应格式，使用PageResult封装分页数据
-- 完善API的错误处理和状态码使用规范
+- 强化了分层架构规则，确保Entity不会出现在Controller层的方法签名中
+- 清理了所有违反分层架构的非法Entity导入和违规端点
+- 完善了DTO转换机制，确保数据在Controller与Service之间通过DTO传递
+- 增强了架构合规性检查和最佳实践指导
 
 ## 目录
 1. [简介](#简介)
@@ -63,7 +70,7 @@
 10. [附录：新增API端点规范与示例](#附录新增api端点规范与示例)
 
 ## 简介
-本章节面向TaskBoard后端API控制器层，聚焦RESTful设计原则在HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController中的落地实践。文档从HTTP方法选择、URL路径设计、状态码使用入手，完整梳理从HTTP请求接收到响应返回的处理链路；解析@RestContoller与@RequestMapping注解的使用方式与最佳实践；说明参数绑定、数据验证与异常处理机制；并给出API版本控制、请求拦截器与中间件的设计理念，以及开发新API端点的规范与参考路径。
+本章节面向TaskBoard后端API控制器层，聚焦RESTful设计原则在HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController中的落地实践。**重要更新**：本次修订特别强调了严格的分层架构规则，确保Entity不会出现在Controller层的方法签名中，所有数据交互必须通过DTO进行转换。文档从HTTP方法选择、URL路径设计、状态码使用入手，完整梳理从HTTP请求接收到响应返回的处理链路；解析@RestContoller与@RequestMapping注解的使用方式与最佳实践；说明参数绑定、数据验证与异常处理机制；并给出API版本控制、请求拦截器与中间件的设计理念，以及开发新API端点的规范与参考路径。
 
 **更新摘要**
 - ApiResponse成功响应码已标准化为0，替代原来的200
@@ -71,10 +78,11 @@
 - TaskController实现了复杂的状态机验证逻辑和状态转换端点
 - 引入了统一的错误处理基础设施(BizException、ErrorCode、GlobalExceptionHandler)
 - 统一的分页响应格式提升了API的一致性和可维护性
+- **新增** 严格遵循分层架构规则，确保Entity不会出现在Controller层
 - 增强了错误处理模式和业务逻辑验证机制
 
 ## 项目结构
-本项目采用前后端分离的Monorepo结构，后端基于Spring Boot 4（Java 25），前端为React 19。后端服务默认监听8080端口，所有API统一以/api为前缀暴露。健康检查接口位于controller包下，项目管理API同样位于controller包中，新增的任务管理API、标签管理API、工时管理API和统计报表API也遵循相同的组织结构，统一的响应体封装在dto包中，增强的错误处理基础设施位于common包中。
+本项目采用前后端分离的Monorepo结构，后端基于Spring Boot 4（Java 25），前端为React 19。后端服务默认监听8080端口，所有API统一以/api为前缀暴露。健康检查接口位于controller包下，项目管理API同样位于controller包中，新增的任务管理API、标签管理API、工时管理API和统计报表API也遵循相同的组织结构。**关键架构约束**：所有Controller层只使用DTO进行数据交换，Entity类被严格限制在Service层和数据访问层中使用。统一的响应体封装在dto包中，增强的错误处理基础设施位于common包中。
 
 ```mermaid
 graph TB
@@ -90,10 +98,10 @@ H["ErrorCode<br/>错误码常量"]
 I["GlobalExceptionHandler<br/>全局异常处理"]
 J["ApiResponse<T><br/>统一响应体<br/>成功码: 0"]
 K["PageResult<T><br/>分页结果"]
-L["Project实体<br/>JPA映射"]
-M["Task实体<br/>JPA映射"]
-N["Tag实体<br/>JPA映射"]
-O["TimeLog实体<br/>JPA映射"]
+L["Project实体<br/>JPA映射<br/>(仅限Service层)"]
+M["Task实体<br/>JPA映射<br/>(仅限Service层)"]
+N["Tag实体<br/>JPA映射<br/>(仅限Service层)"]
+O["TimeLog实体<br/>JPA映射<br/>(仅限Service层)"]
 P["ProjectService<br/>业务逻辑"]
 Q["TaskService<br/>业务逻辑<br/>状态机验证"]
 R["TagService<br/>业务逻辑"]
@@ -174,6 +182,8 @@ A -.-> Y
 - **新增** TagRepository：数据访问层，继承JpaRepository提供标签相关的数据操作。
 - **新增** TimeLogRepository：数据访问层，继承JpaRepository提供工时记录相关的数据操作。
 
+**架构约束**：所有Controller层方法签名中禁止出现Entity类型，必须使用DTO进行数据传输。Entity类仅在Service层和数据访问层中使用，确保良好的分层架构。
+
 章节来源
 - [HealthController.java:14-26](file://server/src/main/java/com/taskboard/controller/HealthController.java#L14-L26)
 - [ProjectController.java:14-77](file://server/src/main/java/com/taskboard/controller/ProjectController.java#L14-L77)
@@ -188,7 +198,7 @@ A -.-> Y
 - [PageResult.java:8-59](file://server/src/main/java/com/taskboard/common/PageResult.java#L8-L59)
 
 ## 架构总览
-下图展示了从客户端发起请求到控制器处理并返回响应的整体流程，包括Spring MVC的映射、控制器方法执行、业务逻辑处理、数据持久化与统一响应体封装。新增的TimeLogController和StatsController遵循相同的架构模式，同时集成了新的错误处理基础设施。
+下图展示了从客户端发起请求到控制器处理并返回响应的整体流程，包括Spring MVC的映射、控制器方法执行、业务逻辑处理、数据持久化与统一响应体封装。**重要更新**：所有数据流都经过DTO转换，确保Entity不会泄露到Controller层。新增的TimeLogController和StatsController遵循相同的架构模式，同时集成了新的错误处理基础设施。
 
 ```mermaid
 sequenceDiagram
@@ -202,10 +212,10 @@ participant Resp as "ApiResponse"
 participant HTTP as "HTTP响应"
 Client->>SpringMVC : "POST /api/timelogs"
 SpringMVC->>Controller : "路由匹配 @PostMapping"
-Controller->>Service : "create(request)"
-Service->>Repo : "save(timeLog)"
-Repo-->>Service : "保存的工时记录对象"
-Service-->>Controller : "返回工时记录DTO"
+Controller->>Service : "create(request DTO)"
+Service->>Repo : "save(timeLog Entity)"
+Repo-->>Service : "保存的Entity对象"
+Service-->>Controller : "返回DTO (非Entity)"
 Controller->>Resp : "构造成功响应体 ApiResponse.success(...)<br/>code=0"
 Controller-->>SpringMVC : "ResponseEntity.ok(Resp)"
 SpringMVC-->>Client : "201 Created + JSON {code : 0,message,data}"
@@ -231,6 +241,8 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 通过ResponseEntity.ok(...)返回200 OK，表示请求成功。
   - 业务状态码由ApiResponse.code表达，**更新**成功场景现在统一为0，而非之前的200。
 
+**架构合规性**：HealthController仅使用Map作为数据类型，不涉及任何Entity，完全符合分层架构要求。
+
 章节来源
 - [HealthController.java:14-26](file://server/src/main/java/com/taskboard/controller/HealthController.java#L14-L26)
 - [application.properties:1-2](file://server/src/main/resources/application.properties#L1-L2)
@@ -253,6 +265,8 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 400 Bad Request：参数验证失败
   - 409 Conflict：资源冲突（如重复名称）
   - **更新** 业务响应码统一为0表示成功，HTTP状态码与业务状态码分离
+
+**架构合规性**：ProjectController的所有方法签名都使用ProjectDto而非Project实体，确保Entity不会泄露到Controller层。
 
 章节来源
 - [ProjectController.java:27-76](file://server/src/main/java/com/taskboard/controller/ProjectController.java#L27-L76)
@@ -284,7 +298,9 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - DONE → IN_PROGRESS：任务重新打开
   - CLOSED：终态，不允许任何状态转换
 
-**更新** TaskController实现了完整的RESTful CRUD操作和复杂的状态机验证逻辑，遵循标准的HTTP语义和状态码约定，并使用标准化的成功响应码0。新增的状态转换端点提供了细粒度的状态管理能力。
+**架构合规性**：TaskController的所有方法签名都使用TaskDto而非Task实体，确保Entity不会泄露到Controller层。新增的状态转换端点提供了细粒度的状态管理能力。
+
+**更新** TaskController实现了完整的RESTful CRUD操作和复杂的状态机验证逻辑，遵循标准的HTTP语义和状态码约定，并使用标准化的成功响应码0。
 
 章节来源
 - [TaskController.java:29-88](file://server/src/main/java/com/taskboard/controller/TaskController.java#L29-L88)
@@ -307,6 +323,8 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 400 Bad Request：参数验证失败
   - 409 Conflict：标签名称重复
   - **更新** 业务响应码统一为0表示成功，HTTP状态码与业务状态码分离
+
+**架构合规性**：TagController的所有方法签名都使用TagDto而非Tag实体，确保Entity不会泄露到Controller层。
 
 **更新** TagController实现了完整的RESTful CRUD操作，遵循标准的HTTP语义和状态码约定，并使用标准化的成功响应码0。
 
@@ -334,6 +352,8 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 默认分页大小为20，最大限制为100条记录
   - 支持按任务ID过滤工时记录
 
+**架构合规性**：TimeLogController的所有方法签名都使用TimeLogDto而非TimeLog实体，确保Entity不会泄露到Controller层。
+
 **更新** TimeLogController实现了完整的RESTful API，支持分页查询、参数过滤和统一的分页响应格式，遵循标准的HTTP语义和状态码约定。
 
 章节来源
@@ -360,7 +380,9 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 按周聚合：包含ISO周标识、总工时、参与任务数量
   - 按状态聚合：包含任务状态、任务数量、总工时
 
-**更新** StatsController实现了完整的统计报表API，支持多种统计维度和时间范围过滤，使用标准化的成功响应码0。
+**架构合规性**：StatsController的所有方法签名都使用专门的统计DTO（StatsByProjectItem、StatsByWeekItem、StatsByStatusItem）而非Task实体，确保Entity不会泄露到Controller层。**重要更新**：之前存在的违规端点`/tasks-quick`已被移除，该端点直接返回Task实体违反了分层架构规则。
+
+**更新** StatsController实现了完整的统计报表API，支持多种统计维度和时间范围过滤，使用标准化的成功响应码0，并严格遵守分层架构规则。
 
 章节来源
 - [StatsController.java:30-52](file://server/src/main/java/com/taskboard/controller/StatsController.java#L30-L52)
@@ -406,13 +428,15 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
 - **新增** @DateTimeFormat
   - 用于日期参数的格式化解析，支持ISO日期格式。
 
-最佳实践建议
-- 控制器仅负责请求路由与响应组装，业务逻辑下沉至Service层。
-- 使用ResponseEntity显式控制HTTP状态码，增强可观测性与一致性。
-- 统一响应体封装于ApiResponse，保证前后端契约稳定，**更新**成功响应码统一为0。
-- 在Service层进行业务验证和异常处理，保持控制器简洁。
-- **新增** 使用BizException和ErrorCode进行业务异常的规范化处理。
-- **新增** 使用PageResult封装分页数据，提供一致的分页响应格式。
+**架构约束最佳实践**
+- **严禁**在Controller方法签名中使用Entity类型
+- 控制器仅负责请求路由与响应组装，业务逻辑下沉至Service层
+- 使用ResponseEntity显式控制HTTP状态码，增强可观测性与一致性
+- 统一响应体封装于ApiResponse，保证前后端契约稳定，**更新**成功响应码统一为0
+- 在Service层进行业务验证和异常处理，保持控制器简洁
+- **新增** 使用BizException和ErrorCode进行业务异常的规范化处理
+- **新增** 使用PageResult封装分页数据，提供一致的分页响应格式
+- **新增** 所有Controller方法必须使用DTO进行数据传输
 
 章节来源
 - [HealthController.java:14-26](file://server/src/main/java/com/taskboard/controller/HealthController.java#L14-L26)
@@ -439,6 +463,8 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - **新增** 全局异常处理：GlobalExceptionHandler统一捕获并转换为ApiResponse错误格式
   - **新增** 错误码映射：根据错误码自动映射到合适的HTTP状态码
   - 对未找到资源、参数非法、权限不足等分别返回合适的HTTP状态码（404、400、403等）
+
+**架构约束**：所有Controller方法的参数和返回值都必须使用DTO类型，禁止直接使用Entity类型。
 
 **更新** 整个参数绑定和数据验证机制得到了显著增强，新增了日期参数处理、严格的业务验证和统一的全局异常处理机制。
 
@@ -473,11 +499,12 @@ Note over ExceptionHandler : 如果发生BizException或ResponseStatusException<
   - 将鉴权、限流、灰度等能力抽象为可插拔组件，按需要装配。
   - 与统一响应体结合，确保错误信息标准化输出，**更新**成功响应码统一为0。
   - **新增** 与全局异常处理集成，确保所有异常都能转换为统一的错误响应格式。
+  - **新增** 在拦截器中添加架构合规性检查，防止Entity类型泄露到Controller层
 
 [本节为通用设计说明，不直接分析具体代码文件]
 
 ## 依赖关系分析
-HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController都依赖统一响应体ApiResponse，并通过Spring MVC完成请求映射与响应序列化。各控制器还依赖相应的Service进行业务逻辑处理，形成清晰的三层架构。**新增**的TimeLogController和StatsController引入了新的依赖关系，同时所有控制器都受益于增强的错误处理基础设施。测试用例通过MockMvc验证接口行为。
+HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController都依赖统一响应体ApiResponse，并通过Spring MVC完成请求映射与响应序列化。各控制器还依赖相应的Service进行业务逻辑处理，形成清晰的三层架构。**重要更新**：所有Controller层只依赖DTO类型，Entity类型被严格限制在Service层和数据访问层中。测试用例通过MockMvc验证接口行为。
 
 ```mermaid
 classDiagram
@@ -485,10 +512,10 @@ class HealthController {
 +health() ResponseEntity~ApiResponse~Map~String,String~~
 }
 class ProjectController {
-+getAllProjects() ApiResponse~Project[]~
-+createProject(name, description) ApiResponse~Project~
-+getProject(id) ApiResponse~Project~
-+updateProject(id, name, description) ApiResponse~Project~
++getAllProjects() ApiResponse~ProjectDto[]~
++createProject(name, description) ApiResponse~ProjectDto~
++getProject(id) ApiResponse~ProjectDto~
++updateProject(id, name, description) ApiResponse~ProjectDto~
 +deleteProject(id) ApiResponse~Void~
 }
 class TaskController {
@@ -531,10 +558,10 @@ class GlobalExceptionHandler {
 +handleIllegalArgument(ex) ResponseEntity~ApiErrorResult~
 }
 class ProjectService {
-+getAllProjects() Project[]
-+createProject(name, description) Project
-+getProjectById(id) Project
-+updateProject(id, name, description) Project
++getAllProjects() ProjectDto[]
++createProject(name, description) ProjectDto
++getProjectById(id) Optional~ProjectDto~
++updateProject(id, name, description) ProjectDto
 +deleteProject(id) void
 }
 class TaskService {
@@ -647,6 +674,8 @@ GlobalExceptionHandler --> ErrorCode : "错误码映射"
 - 使用@Transactional确保数据一致性，但需注意事务边界避免过长事务。
 - **新增** 统计服务使用只读事务(@Transactional(readOnly = true))提升查询性能。
 
+**架构优化**：通过DTO转换减少了不必要的Entity字段传输，提高了网络传输效率。所有Controller层方法都避免了Entity的直接操作，降低了耦合度。
+
 **更新** TimeLogService和StatsService引入了事务管理和优化的查询方法，提升了数据操作的可靠性和性能。TaskService的状态机验证逻辑增加了额外的计算开销，但保证了业务规则的严格执行。同时使用标准化的成功响应码0减少了响应体大小。新增的分页机制有效控制了单次查询的数据量。
 
 [本节为通用性能建议，不直接分析具体代码文件]
@@ -683,8 +712,12 @@ GlobalExceptionHandler --> ErrorCode : "错误码映射"
   - 检查日期参数格式，确保weekStart和weekEnd为有效的ISO日期格式。
   - 验证日期范围合理性，避免无效的时间范围查询。
   - 确认数据库中存在相关数据，避免空结果集处理异常。
+- **新增** 架构合规性检查
+  - 确保Controller方法签名中没有使用Entity类型
+  - 检查是否有非法的Entity import语句
+  - 验证所有数据交换都通过DTO进行
 
-**更新** 新增了任务相关API、标签相关API、工时记录API和统计API的故障排查指导，包括状态机验证、参数验证、资源存在性检查、分页参数验证和日期格式验证，以及成功响应码标准化为0的注意事项。
+**更新** 新增了任务相关API、标签相关API、工时记录API和统计API的故障排查指导，包括状态机验证、参数验证、资源存在性检查、分页参数验证和日期格式验证，以及成功响应码标准化为0的注意事项。新增了架构合规性检查指导，确保分层架构规则得到严格遵守。
 
 章节来源
 - [application.properties:1-2](file://server/src/main/resources/application.properties#L1-L2)
@@ -696,7 +729,9 @@ GlobalExceptionHandler --> ErrorCode : "错误码映射"
 - [StatsService.java:81-87](file://server/src/main/java/com/taskboard/service/StatsService.java#L81-L87)
 
 ## 结论
-HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController共同构成了TaskBoard的后端API控制器层，以简洁的方式实现了RESTful健康检查、项目管理系统、任务管理系统、标签管理系统、工时记录系统和统计报表系统。六个控制器都遵循了清晰的HTTP语义、合理的URL设计与一致的状态码约定。**更新**通过统一响应体ApiResponse的成功响应码标准化为0，以及增强的错误处理基础设施(BizException、ErrorCode、GlobalExceptionHandler)，保证了前后端契约的一致性和API设计的规范性。新增的TimeLogController和StatsController完善了系统的工时管理和统计分析功能，展现了完整的RESTful API设计模式。特别是TaskController的状态机验证机制、TimeLogController的分页查询功能和StatsController的多维度统计能力体现了复杂的业务逻辑处理能力。后续可在该基础上扩展更多业务端点，并引入全局异常处理、参数校验、API版本化与拦截器等工程化能力，提升系统的可维护性与可观测性。
+HealthController、ProjectController、TaskController、TagController、TimeLogController和StatsController共同构成了TaskBoard的后端API控制器层，以简洁的方式实现了RESTful健康检查、项目管理系统、任务管理系统、标签管理系统、工时记录系统和统计报表系统。六个控制器都遵循了清晰的HTTP语义、合理的URL设计与一致的状态码约定。**重要更新**：通过严格遵循分层架构规则，确保Entity不会出现在Controller层的方法签名中，所有数据交互都通过DTO进行转换，这体现了架构设计的严谨性和可维护性。通过统一响应体ApiResponse的成功响应码标准化为0，以及增强的错误处理基础设施(BizException、ErrorCode、GlobalExceptionHandler)，保证了前后端契约的一致性和API设计的规范性。新增的TimeLogController和StatsController完善了系统的工时管理和统计分析功能，展现了完整的RESTful API设计模式。特别是TaskController的状态机验证机制、TimeLogController的分页查询功能和StatsController的多维度统计能力体现了复杂的业务逻辑处理能力。后续可在该基础上扩展更多业务端点，并引入全局异常处理、参数校验、API版本化与拦截器等工程化能力，提升系统的可维护性与可观测性。
+
+**架构改进总结**：本次重构成功消除了所有违反分层架构的代码，建立了严格的Entity隔离机制，为项目的长期可维护性奠定了坚实基础。
 
 [本节为总结性内容，不直接分析具体代码文件]
 
@@ -724,6 +759,11 @@ HealthController、ProjectController、TaskController、TagController、TimeLogC
   - **新增** 使用BizException抛出业务异常，携带ErrorCode
   - **新增** GlobalExceptionHandler统一处理异常，转换为包含errors数组的错误响应
   - **新增** 错误码分类：40xxx参数错误、42xxx状态转换错误、49xxx内部错误
+- **新增** 架构约束
+  - **严禁**在Controller方法签名中使用Entity类型
+  - 所有数据交换必须通过DTO进行
+  - Entity类仅限Service层和数据访问层使用
+  - 定期运行架构合规性检查，防止Entity泄露
 - 示例（概念性步骤）
   - 新建DTO：定义字段与校验规则
   - 新建Controller：使用@RestController与@RequestMapping标注
@@ -731,8 +771,9 @@ HealthController、ProjectController、TaskController、TagController、TimeLogC
   - 组装响应：使用ApiResponse.success/error，**更新**成功响应自动使用code=0
   - 处理异常：使用BizException和ErrorCode抛出业务异常
   - 分页处理：使用PageResult封装分页数据
+  - 架构检查：确保没有Entity类型出现在Controller方法签名中
   - 编写测试：使用MockMvc断言状态码与JSON字段，**更新**注意code字段断言应为0
 
-**更新** 新增了业务响应码标准化的重要规范，成功响应统一使用code=0，这是ApiResponse标准化设计的关键特性。同时新增了特殊操作路径的设计模式，如任务状态转换的/transitions子路径，以及统计端点的描述性子路径设计。新增了分页响应格式和错误处理机制的规范要求。
+**更新** 新增了业务响应码标准化的重要规范，成功响应统一使用code=0，这是ApiResponse标准化设计的关键特性。同时新增了特殊操作路径的设计模式，如任务状态转换的/transitions子路径，以及统计端点的描述性子路径设计。新增了分页响应格式和错误处理机制的规范要求。**最重要的是**，新增了严格的架构约束规范，确保Entity不会泄露到Controller层，这是本次重构的核心改进。
 
 [本节为通用规范与步骤说明，不直接分析具体代码文件]

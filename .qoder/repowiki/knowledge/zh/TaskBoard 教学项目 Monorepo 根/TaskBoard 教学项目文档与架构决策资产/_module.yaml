@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: docs
-title: TaskBoard 项目文档与规范资产
+title: TaskBoard 教学项目文档与架构决策资产
 scope:
     - docs/
 source_files: []

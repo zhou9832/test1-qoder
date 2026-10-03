@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: master
 nodes_managed: true
-exported_at: "2026-10-03T06:05:02Z"
+exported_at: "2026-10-03T09:02:37Z"
 modules:
     "":
-        dir_name: TaskBoard Monorepo 根目录
-        title: TaskBoard Monorepo 根目录
+        dir_name: TaskBoard 教学项目 Monorepo 根
+        title: TaskBoard 教学项目 Monorepo 根
         scope:
             - README.md
             - INIT_REPORT.md
@@ -20,8 +20,8 @@ modules:
         depends_on: []
         related_to: []
     docs:
-        dir_name: TaskBoard 项目文档与规范资产
-        title: TaskBoard 项目文档与规范资产
+        dir_name: TaskBoard 教学项目文档与架构决策资产
+        title: TaskBoard 教学项目文档与架构决策资产
         scope:
             - docs/
         source_files: []
@@ -29,8 +29,8 @@ modules:
         depends_on: []
         related_to: []
     server:
-        dir_name: TaskBoard Spring Boot 后端服务
-        title: TaskBoard Spring Boot 后端服务
+        dir_name: TaskBoard 后端服务
+        title: TaskBoard 后端服务
         scope:
             - server/
         source_files: []

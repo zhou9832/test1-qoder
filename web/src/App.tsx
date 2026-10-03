@@ -7,6 +7,7 @@ import {
   UnorderedListOutlined,
   ClockCircleOutlined,
   BarChartOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import zhCN from 'antd/locale/zh_CN'
 import HomePage from './pages/HomePage'
@@ -16,6 +17,7 @@ import TagsPage from './pages/TagsPage'
 import BoardPage from './pages/BoardPage'
 import TimeLogsPage from './pages/TimeLogsPage'
 import StatsPage from './pages/StatsPage'
+import CommentsPage from './pages/CommentsPage'
 
 const { Sider, Content } = Layout
 
@@ -61,17 +63,20 @@ function AppLayout() {
         />
       </Sider>
       <Layout>
-        <Content style={{ margin: '16px', minHeight: 280 }}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:id/board" element={<BoardPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/tags" element={<TagsPage />} />
-            <Route path="/timelogs" element={<TimeLogsPage />} />
-            <Route path="/stats" element={<StatsPage />} />
-          </Routes>
-        </Content>
+        <Layout style={{ padding: '0 16px' }}>
+          <Content style={{ margin: '16px 0', minHeight: 280 }}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/:id/board" element={<BoardPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/tags" element={<TagsPage />} />
+              <Route path="/timelogs" element={<TimeLogsPage />} />
+              <Route path="/stats" element={<StatsPage />} />
+              <Route path="/tasks/:taskId/comments" element={<CommentsPage />} />
+            </Routes>
+          </Content>
+        </Layout>
       </Layout>
     </Layout>
   )

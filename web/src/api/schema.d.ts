@@ -57,6 +57,17 @@ export interface TimeLogDto {
 }
 
 /**
+ * Comment DTO from API contract
+ */
+export interface CommentDto {
+  id: number;
+  taskId: number;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
+/**
  * Task transition result from API contract
  */
 export interface TaskTransitionResult {
