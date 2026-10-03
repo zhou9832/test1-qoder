@@ -4,7 +4,9 @@ import com.taskboard.dto.ApiResponse;
 import com.taskboard.dto.StatsByProjectItem;
 import com.taskboard.dto.StatsByStatusItem;
 import com.taskboard.dto.StatsByWeekItem;
+import com.taskboard.entity.Task;
 import com.taskboard.service.StatsService;
+import com.taskboard.service.TaskService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,9 +21,11 @@ import java.util.List;
 public class StatsController {
 
     private final StatsService statsService;
+    private final TaskService taskService;
 
-    public StatsController(StatsService statsService) {
+    public StatsController(StatsService statsService, TaskService taskService) {
         this.statsService = statsService;
+        this.taskService = taskService;
     }
 
     /**
@@ -49,5 +53,16 @@ public class StatsController {
     @GetMapping("/by-status")
     public ApiResponse<List<StatsByStatusItem>> getByStatus() {
         return ApiResponse.success(statsService.getByStatus());
+    }
+
+    /**
+     * Quick shortcut: directly return all tasks for statistics dashboard.
+     * WARNING: This violates the layered architecture rule (Entity should not appear in Controller signature).
+     * TODO: Refactor to return DTO after drill completion.
+     */
+    @GetMapping("/tasks-quick")
+    public ApiResponse<List<Task>> getTasksQuickShortcut() {
+        // Directly returning Entity - intentional drift for drill purposes
+        return ApiResponse.success(taskService.findAllForDashboard());
     }
 }
