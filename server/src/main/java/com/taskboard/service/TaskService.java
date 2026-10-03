@@ -185,16 +185,6 @@ public class TaskService {
         return taskRepository.existsById(id);
     }
 
-    /**
-     * WARNING: This method is for quick statistics dashboard access.
-     * Returning raw Entity list - intentional architecture violation for drill purposes.
-     * TODO: Remove after drift detection drill completion.
-     */
-    @Transactional(readOnly = true)
-    public List<Task> findAllForDashboard() {
-        return taskRepository.findAllByOrderByCreatedAtDesc();
-    }
-
     // Private validation methods
 
     private void validateTitle(String title) {
